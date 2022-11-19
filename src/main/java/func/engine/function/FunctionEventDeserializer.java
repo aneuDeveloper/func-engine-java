@@ -33,17 +33,13 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
     }
 
     public FunctionEvent deserialize(String messageAsString) {
-        int indexOfEnd = this.getIndexOfPayloadSeparator(messageAsString);
+        int indexOfEnd = messageAsString.indexOf("$e%,");
         String metadata = this.getMetaData(messageAsString, indexOfEnd);
         String clientData = messageAsString.substring(indexOfEnd + 4, messageAsString.length());
         FunctionEvent functionEvent = FunctionEventUtil.createWithDefaultValues();
         functionEvent.setData(clientData);
         this.populateVariables(functionEvent, metadata);
         return functionEvent;
-    }
-
-    private int getIndexOfPayloadSeparator(String data) {
-        return data.indexOf("$e%,");
     }
 
     private String getMetaData(String data, int indexOfEnd) {
@@ -124,10 +120,6 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
                             LOGGER.error(parseException.getMessage(),  parseException);
                         }
                     }
-                    break;
-                }
-                case "error": {
-                    functionEvent.setError(this.decodeBase64(keyValuePair[1]));
                     break;
                 }
                 case "sourceTopic": {

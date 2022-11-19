@@ -27,7 +27,20 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
     public static final String PAYLOAD_SEPARATOR = "$e%,";
 
     public byte[] serialize(String topic, FunctionEvent functionEvent) {
-        String retVal = "v=" + functionEvent.getVersion() + ",id=" + functionEvent.getId() + this.getValueAsMillis(",timestamp=", functionEvent.getTimeStamp()) + this.getValue(",processName=", functionEvent.getProcessName()) + this.getValue(functionEvent.getType()) + this.getValue(",comingFromId=", functionEvent.getComingFromId()) + this.getValue(",processInstanceID=", functionEvent.getProcessInstanceID()) + this.getValue(",function=", functionEvent.getFunction()) + this.getValue(",nextRetryAt=", functionEvent.getNextRetryAt()) + this.getRetryCount(functionEvent) + this.getValue(",sourceTopic=", functionEvent.getSourceTopic()) + this.getValue(",correlationState=", functionEvent.getCorrelationState()) + this.getBase64Encoded(",correlationId=", functionEvent.getCorrelationId()) + this.getBase64Encoded(",error=", functionEvent.getError()) + ",$e%," + this.getValue("", functionEvent.getData());
+        String retVal = "v=" + functionEvent.getVersion()
+                + ",id=" + functionEvent.getId()
+                + this.getValueAsMillis(",timestamp=", functionEvent.getTimeStamp())
+                + this.getValue(",processName=", functionEvent.getProcessName())
+                + this.getValue(functionEvent.getType())
+                + this.getValue(",comingFromId=", functionEvent.getComingFromId())
+                + this.getValue(",processInstanceID=", functionEvent.getProcessInstanceID())
+                + this.getValue(",function=", functionEvent.getFunction())
+                + this.getValue(",nextRetryAt=", functionEvent.getNextRetryAt()) + this.getRetryCount(functionEvent)
+                + this.getValue(",sourceTopic=", functionEvent.getSourceTopic())
+                + this.getValue(",correlationState=", functionEvent.getCorrelationState())
+                + this.getBase64Encoded(",correlationId=", functionEvent.getCorrelationId())
+                + ",$e%,"
+                + this.getValue("", functionEvent.getData());
         LOGGER.trace("ProcessEvent is serialized to: {}", retVal);
         return retVal.getBytes();
     }
@@ -82,4 +95,3 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
         return ",retryCount=" + functionEvent.getRetryCount();
     }
 }
-

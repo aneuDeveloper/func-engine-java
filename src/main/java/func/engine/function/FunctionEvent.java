@@ -16,7 +16,7 @@ import func.engine.correlation.CorrelationState;
 
 public class FunctionEvent {
     public static enum Type {
-        END, CORRELATION, CALLBACK, DEAD_LETTER, RETRY, WORKFLOW, TRANSIENT;
+        END, CORRELATION, CALLBACK, DEAD_LETTER, RETRY, WORKFLOW, TRANSIENT, ERROR;
     }
 
     public static final String VERSION = "v";
@@ -30,7 +30,6 @@ public class FunctionEvent {
     public static final String RETRY_COUNT = "retryCount";
     public static final String NEXT_RETRY_AT = "nextRetryAt";
     public static final String SOURCE_TOPIC = "sourceTopic";
-    public static final String ERROR = "error";
     public static final String TYPE = "type";
     public static final String TIMESTAMP = "timestamp";
     private String version;
@@ -41,15 +40,14 @@ public class FunctionEvent {
     private String processInstanceID;
     private String function;
     private Type type;
-    private volatile Function functionObj;
-    private volatile Throwable exception;
     private ZonedDateTime nextRetryAt;
     private int retryCount;
     private String sourceTopic;
     private CorrelationState correlationState;
     private String correlationId;
-    private String error;
     private String data = "";
+
+    private volatile Function functionObj;
 
     protected FunctionEvent(String version, String id) {
         this.version = version;
@@ -128,14 +126,6 @@ public class FunctionEvent {
         this.correlationId = correlationId;
     }
 
-    public String getError() {
-        return this.error;
-    }
-
-    public void setError(String error) {
-        this.error = error;
-    }
-
     public String getData() {
         return this.data;
     }
@@ -160,20 +150,20 @@ public class FunctionEvent {
         this.functionObj = functionObj;
     }
 
-    public Type getType() {
-        return this.type;
-    }
-
-    public void setType(Type type) {
-        this.type = type;
-    }
-
     public ZonedDateTime getTimeStamp() {
         return this.timeStamp;
     }
 
     public void setTimeStamp(ZonedDateTime timeStamp) {
         this.timeStamp = timeStamp;
+    }
+
+    public Type getType() {
+        return this.type;
+    }
+
+    public void setType(Type type) {
+        this.type = type;
     }
 
     public String getSourceTopic() {
@@ -183,13 +173,4 @@ public class FunctionEvent {
     public void setSourceTopic(String sourceTopic) {
         this.sourceTopic = sourceTopic;
     }
-
-    public Throwable getException() {
-        return this.exception;
-    }
-
-    public void setException(Throwable exception) {
-        this.exception = exception;
-    }
-
 }

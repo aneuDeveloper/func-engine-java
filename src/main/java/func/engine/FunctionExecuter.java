@@ -46,14 +46,15 @@ public class FunctionExecuter<T> {
             StringWriter sw = new StringWriter();
             PrintWriter pw = new PrintWriter(sw);
             e.printStackTrace(pw);
-            functionEvent.setError(sw.toString());
-            functionEvent.setException(e);
-            Function function = this.functionWorkflow.getProcessEventUtil().getFunctionObj(functionEvent);
-            if (TransientFunction.class.isAssignableFrom(function.getClass())) {
-                this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FunctionEvent.Type.TRANSIENT), null,
-                        functionEvent);
-            }
-            return functionEvent;
+
+            FunctionEvent nextFunction = FunctionEventUtil.createWithDefaultValues();
+            nextFunction.setProcessName(functionEvent.getProcessName());
+            nextFunction.setComingFromId(functionEvent.getId());
+            nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
+            nextFunction.setType(FunctionEvent.Type.ERROR);
+            nextFunction.setData(sw.toString());
+            // nextFunction.setException(e);
+            return nextFunction;
         }
     }
 

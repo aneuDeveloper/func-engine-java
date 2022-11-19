@@ -353,11 +353,8 @@ public class FunctionsWorkflow<T> {
         if (TransientFunction.class.isAssignableFrom(function.getClass())) {
             FunctionEvent executionResult = this.processEventExecuter
                     .executeMessageAndDiscoverNextStep(newKafkaEventMessage);
-            if (executionResult.getException() != null) {
-                if (RuntimeException.class.isAssignableFrom(executionResult.getException().getClass())) {
-                    throw (RuntimeException) executionResult.getException();
-                }
-                throw new RuntimeException(executionResult.getException());
+            if (executionResult.getType() == FunctionEvent.Type.ERROR) {
+                throw new RuntimeException(executionResult.getData());
             }
             return new ReadableControlImpl<T>(executionResult, processInstanceID.toString(), this.dataSerDes);
         }

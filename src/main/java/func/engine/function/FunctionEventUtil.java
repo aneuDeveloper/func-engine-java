@@ -52,7 +52,7 @@ public class FunctionEventUtil {
             return functionEvent.getFunctionObj();
         }
         if (functionEvent.getFunctionObj() == null) {
-            LOGGER.error("Step Bean has not been defined and could not be deserialized for String represention.");
+            LOGGER.error("Function object has not been defined and could not be deserialized for String represention.");
         }
         return functionEvent.getFunctionObj();
     }
