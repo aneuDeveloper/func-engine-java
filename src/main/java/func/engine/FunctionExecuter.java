@@ -53,7 +53,6 @@ public class FunctionExecuter<T> {
             nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
             nextFunction.setType(FunctionEvent.Type.ERROR);
             nextFunction.setData(sw.toString());
-            // nextFunction.setException(e);
             return nextFunction;
         }
     }
