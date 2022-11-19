@@ -70,7 +70,6 @@ public class CorrelationStream<T> {
             callbackReceivedMessage.setFunction(correlationProcessEvent.getFunction());
             callbackReceivedMessage.setProcessInstanceID(correlationProcessEvent.getProcessInstanceID());
             callbackReceivedMessage.setComingFromId(correlationProcessEvent.getId());
-            callbackReceivedMessage.setCorrelationId(correlationProcessEvent.getCorrelationId());
             callbackReceivedMessage.setCorrelationState(CorrelationState.CALLBACK_FORWARDED);
             callbackReceivedMessage.setType(FunctionEvent.Type.WORKFLOW);
             FunctionContextSerDes<T> dataSerDes = this.processDefinition.getDataSerDes();

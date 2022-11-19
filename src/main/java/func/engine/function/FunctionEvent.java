@@ -44,9 +44,9 @@ public class FunctionEvent {
     private int retryCount;
     private String sourceTopic;
     private CorrelationState correlationState;
-    private String correlationId;
     private String data = "";
-
+    
+    private volatile String correlationId;
     private volatile Function functionObj;
 
     protected FunctionEvent(String version, String id) {

@@ -38,7 +38,6 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
                 + this.getValue(",nextRetryAt=", functionEvent.getNextRetryAt()) + this.getRetryCount(functionEvent)
                 + this.getValue(",sourceTopic=", functionEvent.getSourceTopic())
                 + this.getValue(",correlationState=", functionEvent.getCorrelationState())
-                + this.getBase64Encoded(",correlationId=", functionEvent.getCorrelationId())
                 + ",$e%,"
                 + this.getValue("", functionEvent.getData());
         LOGGER.trace("ProcessEvent is serialized to: {}", retVal);

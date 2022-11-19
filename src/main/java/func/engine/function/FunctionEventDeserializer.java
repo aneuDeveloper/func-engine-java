@@ -97,10 +97,6 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
                     functionEvent.setCorrelationState(CorrelationState.valueOf(keyValuePair[1]));
                     break;
                 }
-                case "correlationId": {
-                    functionEvent.setCorrelationId(this.decodeBase64(keyValuePair[1]));
-                    break;
-                }
                 case "retryCount": {
                     functionEvent.setRetryCount(Integer.parseInt(keyValuePair[1]));
                     break;

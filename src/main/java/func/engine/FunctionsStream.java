@@ -26,7 +26,6 @@ import org.apache.kafka.streams.processor.RecordContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import func.engine.correlation.CorrelationState;
 import func.engine.function.FunctionEvent;
 import func.engine.function.FunctionEventTransformer;
 
@@ -83,7 +82,7 @@ public class FunctionsStream<T> {
             @Override
             public KeyValue<String, FunctionEvent> transform(String key, FunctionEvent functionEvent) {
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Message received: {}",  new String(FunctionsStream.this.processDefinition
+                    LOGGER.trace("Message received: {}", new String(FunctionsStream.this.processDefinition
                             .getSerde().serializer().serialize(null, functionEvent)));
                 }
                 if (functionEvent.getNextRetryAt() != null) {
@@ -95,11 +94,10 @@ public class FunctionsStream<T> {
     }
 
     private String selectTopicKey(String key, FunctionEvent functionEvent) {
-        if (this.shouldCreateCorrelationMessage(functionEvent)) {
-            String topicKeyIncludesProcessNameAndCorrelationId = this.processDefinition
-                    .getProcessNameWithCorrelationId(functionEvent.getCorrelationId());
-            return topicKeyIncludesProcessNameAndCorrelationId;
+        if (functionEvent.getType() == FunctionEvent.Type.CORRELATION) {
+            return functionEvent.getCorrelationId();
         }
+        // TODO check if getId() is required by retries, probably not.
         if (functionEvent.getNextRetryAt() != null) {
             return functionEvent.getId();
         }
@@ -109,14 +107,6 @@ public class FunctionsStream<T> {
     private String toTopic(String key, FunctionEvent functionEvent, RecordContext recordContext) {
         String topic = this.processDefinition.getTopicResolver().resolveTopicName(functionEvent.getType());
         return topic;
-    }
-
-    private boolean shouldCreateCorrelationMessage(FunctionEvent functionEvent) {
-        if (functionEvent.getCorrelationState() != CorrelationState.INITIALIZED) {
-            return false;
-        }
-        String correlationId = functionEvent.getCorrelationId();
-        return correlationId != null && !correlationId.isBlank();
     }
 
     public void close() {
