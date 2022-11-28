@@ -77,21 +77,21 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
                     functionEvent.setComingFromId(keyValuePair[1]);
                     break;
                 }
-                case "function": {
+                case "func": {
                     functionEvent.setFunction(keyValuePair[1]);
                     break;
                 }
-                case "processStep": {
-                    functionEvent.setFunction(keyValuePair[1]);
-                    break;
-                }
-                case "type": {
+                case "func_type": {
                     try {
                         functionEvent.setType(FunctionEvent.Type.valueOf(keyValuePair[1]));
                     } catch (Exception e) {
                         LOGGER.error("Unknown FunctionEvent.Type=" + keyValuePair[1]);
                     }
                     continue;
+                }
+                case "processStep": {
+                    functionEvent.setFunction(keyValuePair[1]);
+                    break;
                 }
                 case "correlationState": {
                     functionEvent.setCorrelationState(CorrelationState.valueOf(keyValuePair[1]));
@@ -106,14 +106,15 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
                         functionEvent.setNextRetryAt(ZonedDateTime.parse(keyValuePair[1]));
                     } catch (RuntimeException e) {
                         LOGGER.error(
-                                "Could not parse NextRetryAt=" + keyValuePair[1] + " trying to parse other dateformet.", e);
+                                "Could not parse NextRetryAt=" + keyValuePair[1] + " trying to parse other dateformet.",
+                                e);
                         try {
                             Date parsedNextRetryAt = FunctionEventSerializer.DATE_FORMAT.parse(keyValuePair[1]);
                             ZoneId id = ZoneId.systemDefault();
                             ZonedDateTime ofInstant = ZonedDateTime.ofInstant(parsedNextRetryAt.toInstant(), id);
                             functionEvent.setNextRetryAt(ofInstant);
                         } catch (ParseException parseException) {
-                            LOGGER.error(parseException.getMessage(),  parseException);
+                            LOGGER.error(parseException.getMessage(), parseException);
                         }
                     }
                     break;
@@ -133,7 +134,7 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
                     ZoneId.systemDefault());
             return dateTime;
         } catch (NumberFormatException e) {
-            LOGGER.error(e.getMessage(),  e);
+            LOGGER.error(e.getMessage(), e);
             return null;
         }
     }

@@ -34,7 +34,7 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
                 + this.getValue(functionEvent.getType())
                 + this.getValue(",comingFromId=", functionEvent.getComingFromId())
                 + this.getValue(",processInstanceID=", functionEvent.getProcessInstanceID())
-                + this.getValue(",function=", functionEvent.getFunction())
+                + this.getValue(",func=", functionEvent.getFunction())
                 + this.getValue(",nextRetryAt=", functionEvent.getNextRetryAt()) + this.getRetryCount(functionEvent)
                 + this.getValue(",sourceTopic=", functionEvent.getSourceTopic())
                 + this.getValue(",correlationState=", functionEvent.getCorrelationState())
@@ -73,18 +73,11 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
         return variableName + value;
     }
 
-    private String getBase64Encoded(String variableName, String value) {
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        return variableName + Base64.getEncoder().encodeToString(value.getBytes());
-    }
-
     private String getValue(FunctionEvent.Type type) {
         if (type == null) {
             return "";
         }
-        return ",type=" + type.name();
+        return ",func_type=" + type.name();
     }
 
     private String getRetryCount(FunctionEvent functionEvent) {
