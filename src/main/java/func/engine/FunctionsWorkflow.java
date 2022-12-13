@@ -39,15 +39,14 @@ import func.engine.correlation.CorrelationMerger;
 import func.engine.correlation.CorrelationState;
 import func.engine.correlation.CorrelationStream;
 import func.engine.correlation.ProcessCorrelation;
-import func.engine.function.Function;
 import func.engine.function.FunctionContextSerDes;
 import func.engine.function.FunctionEvent;
+import func.engine.function.FunctionEvent.Type;
 import func.engine.function.FunctionEventDeserializer;
 import func.engine.function.FunctionEventSerializer;
 import func.engine.function.FunctionEventUtil;
 import func.engine.function.FunctionSerDes;
 import func.engine.function.TransientFunction;
-import func.engine.function.FunctionEvent.Type;
 
 public class FunctionsWorkflow<T> {
     private static final Logger LOG = LoggerFactory.getLogger(FunctionsWorkflow.class);
@@ -344,26 +343,26 @@ public class FunctionsWorkflow<T> {
         newFunctionEvent.setType(FunctionEvent.Type.WORKFLOW);
         newFunctionEvent.setFunction(this.functionSerDes.serialize(processInstance.getFunction()));
         newFunctionEvent.setProcessInstanceID(processInstanceID.toString());
-        if (processInstance.getData() != null) {
-            String serializedData = this.dataSerDes.serialize(processInstance.getData());
-            newFunctionEvent.setData(serializedData);
-        }
+        newFunctionEvent.setFunctionData(processInstance.getData());
         newFunctionEvent.setProcessName(this.getProcessName());
         if (TransientFunction.class.isAssignableFrom(processInstance.getFunction().getClass())) {
             FunctionEvent executionResult = this.processEventExecuter.executeTransientFunction(newFunctionEvent,
                     (TransientFunction) processInstance.getFunction());
             if (executionResult.getType() == FunctionEvent.Type.ERROR) {
-                throw new RuntimeException(executionResult.getData());
+                if (executionResult.getFunctionData() instanceof Throwable) {
+                    throw new RuntimeException((Throwable) executionResult.getFunctionData());
+                }
+                throw new RuntimeException(this.dataSerDes.serialize(executionResult.getFunctionData()));
             }
             if (executionResult.getType() == Type.TRANSIENT || executionResult.getType() == Type.END) {
-                return new ReadableControlImpl<T>(executionResult, processInstanceID.toString(), this.dataSerDes);
+                return new ReadableControlImpl<T>(executionResult, processInstanceID.toString());
             } else {
                 newFunctionEvent = executionResult;
             }
         }
         String destinationTopic = this.topicResolver.resolveTopicName(newFunctionEvent.getType());
         this.sendEventAndWait(destinationTopic, null, newFunctionEvent);
-        return new ReadableControlImpl<T>(null, processInstanceID.toString(), this.dataSerDes);
+        return new ReadableControlImpl<T>(null, processInstanceID.toString());
     }
 
     public ReadableControl<T> correlate(ProcessCorrelation<T> correlation)
@@ -371,15 +370,14 @@ public class FunctionsWorkflow<T> {
         FunctionEvent callbackMessage = FunctionEventUtil.createWithDefaultValues();
         callbackMessage.setCorrelationState(CorrelationState.CALLBACK_RECEIVED);
         callbackMessage.setCorrelationId(correlation.getCorrelationId());
-        String serializedAsString = this.dataSerDes.serialize(correlation.getData());
-        callbackMessage.setData(serializedAsString);
+        callbackMessage.setFunctionData(correlation.getData());
         String topicKeyWithProcessNameAndCorrelationId = this
                 .getProcessNameWithCorrelationId(correlation.getCorrelationId());
         String callbackTopic = this.topicResolver.resolveTopicName(FunctionEvent.Type.CALLBACK);
         this.sendEventAndWait(callbackTopic, topicKeyWithProcessNameAndCorrelationId, callbackMessage);
         FunctionEvent waitedFor = null;
         String processInstanceId = null;
-        return new ReadableControlImpl<T>(waitedFor, processInstanceId, this.dataSerDes);
+        return new ReadableControlImpl<T>(waitedFor, processInstanceId);
     }
 
     public Properties getProperties() {

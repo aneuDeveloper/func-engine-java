@@ -32,7 +32,7 @@ public class FunctionEvent {
     public static final String SOURCE_TOPIC = "sourceTopic";
     public static final String TYPE = "type";
     public static final String TIMESTAMP = "timestamp";
-    
+
     private String version;
     private String id;
     private ZonedDateTime timeStamp;
@@ -45,10 +45,11 @@ public class FunctionEvent {
     private int retryCount;
     private String sourceTopic;
     private CorrelationState correlationState;
-    private String data = "";
+    // private String data = "";
     
     private volatile String correlationId;
     private volatile Function functionObj;
+    private volatile Object functionData;
 
     protected FunctionEvent(String version, String id) {
         this.version = version;
@@ -127,13 +128,13 @@ public class FunctionEvent {
         this.correlationId = correlationId;
     }
 
-    public String getData() {
-        return this.data;
-    }
+    // public String getData() {
+    //     return this.data;
+    // }
 
-    public void setData(String data) {
-        this.data = data;
-    }
+    // public void setData(String data) {
+    //     this.data = data;
+    // }
 
     public String getFunction() {
         return this.function;
@@ -173,5 +174,13 @@ public class FunctionEvent {
 
     public void setSourceTopic(String sourceTopic) {
         this.sourceTopic = sourceTopic;
+    }
+
+    public <T> T  getFunctionData() {
+        return (T) functionData;
+    }
+
+    public void setFunctionData(Object functionData) {
+        this.functionData = functionData;
     }
 }

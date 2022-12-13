@@ -10,8 +10,6 @@
 */
 package func.engine;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
@@ -20,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import func.engine.correlation.CorrelationState;
 import func.engine.function.Function;
 import func.engine.function.FunctionEvent;
+import func.engine.function.FunctionEvent.Type;
 import func.engine.function.FunctionEventUtil;
 import func.engine.function.StatefulAsyncFunction;
 import func.engine.function.StatefulAsyncFunctionControl;
@@ -27,7 +26,6 @@ import func.engine.function.StatefulFunction;
 import func.engine.function.StatefulFunctionControl;
 import func.engine.function.TransientFunction;
 import func.engine.function.TransientFunctionControl;
-import func.engine.function.FunctionEvent.Type;
 
 public class FunctionExecuter<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FunctionExecuter.class);
@@ -44,16 +42,12 @@ public class FunctionExecuter<T> {
             FunctionEvent nextFunctionEvent = this.executeMessage(functionEvent);
             return nextFunctionEvent;
         } catch (Throwable e) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            e.printStackTrace(pw);
-
             FunctionEvent nextFunction = FunctionEventUtil.createWithDefaultValues();
             nextFunction.setProcessName(functionEvent.getProcessName());
             nextFunction.setComingFromId(functionEvent.getId());
             nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
             nextFunction.setType(FunctionEvent.Type.ERROR);
-            nextFunction.setData(sw.toString());
+            nextFunction.setFunctionData(e);
             return nextFunction;
         }
     }
@@ -64,11 +58,12 @@ public class FunctionExecuter<T> {
         endEvent.setType(FunctionEvent.Type.END);
         endEvent.setProcessInstanceID(functionEvent.getProcessInstanceID());
         endEvent.setComingFromId(functionEvent.getId());
-        endEvent.setData(this.functionWorkflow.getDataSerDes().serialize(data));
+        endEvent.setFunctionData(data);
         return endEvent;
     }
 
-    protected FunctionEvent executeMessage(FunctionEvent functionEvent) throws InterruptedException, ExecutionException {
+    protected FunctionEvent executeMessage(FunctionEvent functionEvent)
+            throws InterruptedException, ExecutionException {
         Function function = this.functionWorkflow.getProcessEventUtil().getFunctionObj(functionEvent);
         if (TransientFunction.class.isAssignableFrom(function.getClass())) {
             LOGGER.trace("Execute transient function id={} functionId={} function={}", new Object[] {

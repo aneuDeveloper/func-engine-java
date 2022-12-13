@@ -10,19 +10,15 @@
 */
 package func.engine;
 
-import func.engine.function.FunctionContextSerDes;
 import func.engine.function.FunctionEvent;
 
 public class ReadableControlImpl<T> implements ReadableControl<T> {
     private FunctionEvent functionEvent;
     private String processInstanceId;
-    private FunctionContextSerDes<T> dataSerDes;
 
-    public ReadableControlImpl(FunctionEvent functionEvent, String processInstanceId,
-            FunctionContextSerDes<T> dataSerDes) {
+    public ReadableControlImpl(FunctionEvent functionEvent, String processInstanceId) {
         this.functionEvent = functionEvent;
         this.processInstanceId = processInstanceId;
-        this.dataSerDes = dataSerDes;
     }
 
     @Override
@@ -32,7 +28,6 @@ public class ReadableControlImpl<T> implements ReadableControl<T> {
 
     @Override
     public T getData() {
-        T deserialized = this.dataSerDes.deserialize(this.functionEvent.getData());
-        return deserialized;
+        return this.functionEvent.getFunctionData();
     }
 }

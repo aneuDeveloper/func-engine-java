@@ -32,8 +32,7 @@ public class StatefulAsyncFunctionControl<T> extends StatefulFunctionControl<T>
         correlation.setCorrelationId(correlationId);
         correlation.setFunction(this.sourceFunctionEvent.getFunction());
         correlation.setComingFromId(this.sourceFunctionEvent.getId());
-        String dataAsString = this.workflow.getDataSerDes().serialize(this.data);
-        correlation.setData(dataAsString);
+        correlation.setFunctionData(this.sourceFunctionEvent.getFunctionData());
         return correlation;
     }
 

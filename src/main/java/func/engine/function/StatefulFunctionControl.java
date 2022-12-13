@@ -19,17 +19,15 @@ import func.engine.Retries;
 public class StatefulFunctionControl<T> implements StatefulFunction.WorkflowControl<T> {
     protected FunctionEvent sourceFunctionEvent;
     protected FunctionsWorkflow<T> workflow;
-    protected T data;
 
     public StatefulFunctionControl(FunctionEvent sourceFunctionEvent, FunctionsWorkflow<T> processDefinition) {
         this.sourceFunctionEvent = sourceFunctionEvent;
         this.workflow = processDefinition;
-        this.data = processDefinition.getDataSerDes().deserialize(sourceFunctionEvent.getData());
     }
 
     @Override
     public T getData() {
-        return this.data;
+        return this.sourceFunctionEvent.getFunctionData();
     }
 
     @Override
@@ -41,8 +39,7 @@ public class StatefulFunctionControl<T> implements StatefulFunction.WorkflowCont
         nextFunction.setRetryCount(0);
         nextFunction.setType(FunctionEvent.Type.WORKFLOW);
         this.workflow.getProcessEventUtil().setFunction(nextFunction, function);
-        String dataAsString = this.workflow.getDataSerDes().serialize(this.data);
-        nextFunction.setData(dataAsString);
+        nextFunction.setFunctionData(sourceFunctionEvent.getFunctionData());
         return nextFunction;
     }
 
@@ -61,8 +58,7 @@ public class StatefulFunctionControl<T> implements StatefulFunction.WorkflowCont
         retry.setRetryCount(this.sourceFunctionEvent.getRetryCount() + 1);
         retry.setFunction(this.sourceFunctionEvent.getFunction());
         retry.setProcessInstanceID(this.sourceFunctionEvent.getProcessInstanceID());
-        String dataAsString = this.workflow.getDataSerDes().serialize(this.data);
-        retry.setData(dataAsString);
+        retry.setFunctionData(this.sourceFunctionEvent.getFunctionData());
         return retry;
     }
 

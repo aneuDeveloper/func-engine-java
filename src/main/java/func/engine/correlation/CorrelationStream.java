@@ -73,8 +73,8 @@ public class CorrelationStream<T> {
             callbackReceivedMessage.setCorrelationState(CorrelationState.CALLBACK_FORWARDED);
             callbackReceivedMessage.setType(FunctionEvent.Type.WORKFLOW);
             FunctionContextSerDes<T> dataSerDes = this.processDefinition.getDataSerDes();
-            T callbackData = dataSerDes.deserialize(callbackProcessEvent.getData());
-            T originalData = dataSerDes.deserialize(correlationProcessEvent.getData());
+            T callbackData = dataSerDes.deserialize(callbackProcessEvent.getFunctionData());
+            T originalData = dataSerDes.deserialize(correlationProcessEvent.getFunctionData());
             if (this.processDefinition.getCorrelationMerger() == null) {
                 throw new IllegalStateException(
                         "Correlation merger has not been defined. Please define the merger through configuration with this property correlation.merger.class");
@@ -92,8 +92,7 @@ public class CorrelationStream<T> {
                             return callbackProcessEvent;
                         }
                     });
-            String serializedAsString = dataSerDes.serialize(mergedValue);
-            callbackReceivedMessage.setData(serializedAsString);
+            callbackReceivedMessage.setFunctionData(mergedValue);
             return callbackReceivedMessage;
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);

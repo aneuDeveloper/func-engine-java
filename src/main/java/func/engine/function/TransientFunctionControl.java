@@ -15,12 +15,10 @@ import func.engine.FunctionsWorkflow;
 public class TransientFunctionControl<T> implements TransientFunction.WorkflowControl<T> {
     private FunctionEvent sourceFunctionEvent;
     private FunctionsWorkflow<T> workflow;
-    protected T data;
 
     public TransientFunctionControl(FunctionEvent sourceProcessEvent, FunctionsWorkflow<T> processDefinition) {
         this.sourceFunctionEvent = sourceProcessEvent;
         this.workflow = processDefinition;
-        this.data = processDefinition.getDataSerDes().deserialize(sourceProcessEvent.getData());
     }
 
     @Override
@@ -30,7 +28,7 @@ public class TransientFunctionControl<T> implements TransientFunction.WorkflowCo
 
     @Override
     public T getData() {
-        return this.data;
+        return this.sourceFunctionEvent.getFunctionData();
     }
 
     @Override
@@ -42,8 +40,7 @@ public class TransientFunctionControl<T> implements TransientFunction.WorkflowCo
         nextFunction.setRetryCount(0);
         nextFunction.setType(FunctionEvent.Type.TRANSIENT);
         this.workflow.getProcessEventUtil().setFunction(nextFunction, function);
-        String dataAsString = this.workflow.getDataSerDes().serialize(this.data);
-        nextFunction.setData(dataAsString);
+        nextFunction.setFunctionData(this.sourceFunctionEvent.getFunctionData());
         return nextFunction;
     }
 

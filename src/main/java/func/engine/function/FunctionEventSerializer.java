@@ -13,7 +13,6 @@ package func.engine.function;
 import java.text.SimpleDateFormat;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 
 import org.apache.kafka.common.serialization.Serializer;
 import org.slf4j.Logger;
@@ -25,6 +24,8 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FunctionEventSerializer.class);
     public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     public static final String PAYLOAD_SEPARATOR = "$e%,";
+
+    private FunctionContextSerDes<FunctionEvent> serDes;
 
     public byte[] serialize(String topic, FunctionEvent functionEvent) {
         String retVal = "v=" + functionEvent.getVersion()
@@ -39,7 +40,7 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
                 + this.getValue(",sourceTopic=", functionEvent.getSourceTopic())
                 + this.getValue(",correlationState=", functionEvent.getCorrelationState())
                 + ",$e%,"
-                + this.getValue("", functionEvent.getData());
+                + this.getValue("", this.serDes.serialize(functionEvent.getFunctionData()));
         LOGGER.trace("ProcessEvent is serialized to: {}", retVal);
         return retVal.getBytes();
     }
@@ -85,5 +86,13 @@ public class FunctionEventSerializer implements Serializer<FunctionEvent> {
             return "";
         }
         return ",retryCount=" + functionEvent.getRetryCount();
+    }
+
+    public FunctionContextSerDes<FunctionEvent> getSerDes() {
+        return serDes;
+    }
+
+    public void setSerDes(FunctionContextSerDes<FunctionEvent> serDes) {
+        this.serDes = serDes;
     }
 }

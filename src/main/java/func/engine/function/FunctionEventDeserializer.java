@@ -14,7 +14,6 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Base64;
 import java.util.Date;
 
 import org.apache.kafka.common.serialization.Deserializer;
@@ -25,6 +24,7 @@ import func.engine.correlation.CorrelationState;
 
 public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FunctionEventDeserializer.class);
+    private FunctionContextSerDes<FunctionEvent> serDes;
 
     public FunctionEvent deserialize(String topic, byte[] data) {
         String dataAsString = new String(data);
@@ -37,7 +37,7 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
         String metadata = this.getMetaData(messageAsString, indexOfEnd);
         String clientData = messageAsString.substring(indexOfEnd + 4, messageAsString.length());
         FunctionEvent functionEvent = FunctionEventUtil.createWithDefaultValues();
-        functionEvent.setData(clientData);
+        functionEvent.setFunctionData(serDes.deserialize(clientData));
         this.populateVariables(functionEvent, metadata);
         return functionEvent;
     }
@@ -139,10 +139,11 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
         }
     }
 
-    private String decodeBase64(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return new String(Base64.getDecoder().decode(value));
+    public FunctionContextSerDes<FunctionEvent> getSerDes() {
+        return serDes;
+    }
+
+    public void setSerDes(FunctionContextSerDes<FunctionEvent> serDes) {
+        this.serDes = serDes;
     }
 }
