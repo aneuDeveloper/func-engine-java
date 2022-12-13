@@ -17,12 +17,14 @@ public interface StatefulFunction<T> extends Function {
     public FunctionEvent work(WorkflowControl<T> var1);
 
     public static interface WorkflowControl<T> extends ReadableControl<T> {
-        public FunctionEvent nextFunction(Function function);
+        FunctionEvent nextFunction(Function function);
 
-        public FunctionEvent retry(Retries... retries);
+        FunctionEvent nextFunctionTransient(Function function);
 
-        public FunctionEvent endWorkflow();
+        FunctionEvent retry(Retries... retries);
 
-        public FunctionEvent getSource();
+        FunctionEvent endWorkflow();
+
+        FunctionEvent getSource();
     }
 }

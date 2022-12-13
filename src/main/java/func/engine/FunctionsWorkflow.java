@@ -46,7 +46,7 @@ import func.engine.function.FunctionEventDeserializer;
 import func.engine.function.FunctionEventSerializer;
 import func.engine.function.FunctionEventUtil;
 import func.engine.function.FunctionSerDes;
-import func.engine.function.TransientFunction;
+import func.engine.function.StatefulFunction;
 
 public class FunctionsWorkflow<T> {
     private static final Logger LOG = LoggerFactory.getLogger(FunctionsWorkflow.class);
@@ -345,9 +345,12 @@ public class FunctionsWorkflow<T> {
         newFunctionEvent.setProcessInstanceID(processInstanceID.toString());
         newFunctionEvent.setFunctionData(processInstance.getData());
         newFunctionEvent.setProcessName(this.getProcessName());
-        if (TransientFunction.class.isAssignableFrom(processInstance.getFunction().getClass())) {
-            FunctionEvent executionResult = this.processEventExecuter.executeTransientFunction(newFunctionEvent,
-                    (TransientFunction) processInstance.getFunction());
+        if (processInstance.isTransientFunction()) {
+            if (!(processInstance.getFunction() instanceof StatefulFunction)) {
+                throw new IllegalStateException("A transient function should be of type StatefulFunction");
+            }
+            newFunctionEvent.setType(FunctionEvent.Type.TRANSIENT);
+            FunctionEvent executionResult = this.processEventExecuter.executeMessage(newFunctionEvent);
             if (executionResult.getType() == FunctionEvent.Type.ERROR) {
                 if (executionResult.getFunctionData() instanceof Throwable) {
                     throw new RuntimeException((Throwable) executionResult.getFunctionData());

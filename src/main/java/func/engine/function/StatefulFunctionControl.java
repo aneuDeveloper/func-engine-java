@@ -36,8 +36,19 @@ public class StatefulFunctionControl<T> implements StatefulFunction.WorkflowCont
         nextFunction.setProcessName(this.sourceFunctionEvent.getProcessName());
         nextFunction.setComingFromId(this.sourceFunctionEvent.getId());
         nextFunction.setProcessInstanceID(this.sourceFunctionEvent.getProcessInstanceID());
-        nextFunction.setRetryCount(0);
         nextFunction.setType(FunctionEvent.Type.WORKFLOW);
+        this.workflow.getProcessEventUtil().setFunction(nextFunction, function);
+        nextFunction.setFunctionData(sourceFunctionEvent.getFunctionData());
+        return nextFunction;
+    }
+
+    @Override
+    public FunctionEvent nextFunctionTransient(Function function) {
+        FunctionEvent nextFunction = FunctionEventUtil.createWithDefaultValues();
+        nextFunction.setProcessName(this.sourceFunctionEvent.getProcessName());
+        nextFunction.setComingFromId(this.sourceFunctionEvent.getId());
+        nextFunction.setProcessInstanceID(this.sourceFunctionEvent.getProcessInstanceID());
+        nextFunction.setType(FunctionEvent.Type.TRANSIENT);
         this.workflow.getProcessEventUtil().setFunction(nextFunction, function);
         nextFunction.setFunctionData(sourceFunctionEvent.getFunctionData());
         return nextFunction;

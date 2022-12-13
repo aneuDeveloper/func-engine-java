@@ -17,6 +17,9 @@ public class Retries {
     private int retryTimes = 1;
     private int time = 5;
     private TemporalUnit timeUnit = ChronoUnit.MINUTES;
+    public static final Retries ONE_TIME_IN_5_MINUTES = Retries.build().retryTimes(1).in(5, ChronoUnit.MINUTES);
+    public static final Retries ONE_TIME_IN_1_HOUR = Retries.build().retryTimes(1).in(1, ChronoUnit.HOURS);
+    public static final Retries ONE_TIME_IN_6_HOUR = Retries.build().retryTimes(1).in(6, ChronoUnit.HOURS);
 
     private Retries() {
     }
@@ -54,4 +57,3 @@ public class Retries {
         return this.timeUnit;
     }
 }
-

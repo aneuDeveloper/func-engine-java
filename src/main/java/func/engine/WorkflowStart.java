@@ -15,6 +15,7 @@ import func.engine.function.Function;
 public class WorkflowStart<T> {
     private T data;
     protected Function function;
+    private boolean transientFunction;
 
     public T getData() {
         return this.data;
@@ -31,5 +32,13 @@ public class WorkflowStart<T> {
     public void setFunction(Function function) {
         this.function = function;
     }
-}
 
+    public boolean isTransientFunction() {
+        return transientFunction;
+    }
+
+    public void setTransientFunction(boolean transientFunction) {
+        this.transientFunction = transientFunction;
+    }
+
+}
