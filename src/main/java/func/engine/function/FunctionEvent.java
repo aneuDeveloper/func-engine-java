@@ -32,6 +32,7 @@ public class FunctionEvent {
     public static final String SOURCE_TOPIC = "sourceTopic";
     public static final String TYPE = "type";
     public static final String TIMESTAMP = "timestamp";
+    
     private String version;
     private String id;
     private ZonedDateTime timeStamp;

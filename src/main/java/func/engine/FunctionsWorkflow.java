@@ -47,6 +47,7 @@ import func.engine.function.FunctionEventSerializer;
 import func.engine.function.FunctionEventUtil;
 import func.engine.function.FunctionSerDes;
 import func.engine.function.TransientFunction;
+import func.engine.function.FunctionEvent.Type;
 
 public class FunctionsWorkflow<T> {
     private static final Logger LOG = LoggerFactory.getLogger(FunctionsWorkflow.class);
@@ -339,27 +340,29 @@ public class FunctionsWorkflow<T> {
                     "Missing function. Please provide which function should be called at start.");
         }
         UUID processInstanceID = UUID.randomUUID();
-        FunctionEvent newKafkaEventMessage = FunctionEventUtil.createWithDefaultValues();
-        newKafkaEventMessage.setType(FunctionEvent.Type.WORKFLOW);
-        this.processEventUtil.setFunction(newKafkaEventMessage, processInstance.getFunction());
-        newKafkaEventMessage.setRetryCount(0);
-        newKafkaEventMessage.setProcessInstanceID(processInstanceID.toString());
+        FunctionEvent newFunctionEvent = FunctionEventUtil.createWithDefaultValues();
+        newFunctionEvent.setType(FunctionEvent.Type.WORKFLOW);
+        newFunctionEvent.setFunction(this.functionSerDes.serialize(processInstance.getFunction()));
+        newFunctionEvent.setProcessInstanceID(processInstanceID.toString());
         if (processInstance.getData() != null) {
             String serializedData = this.dataSerDes.serialize(processInstance.getData());
-            newKafkaEventMessage.setData(serializedData);
+            newFunctionEvent.setData(serializedData);
         }
-        newKafkaEventMessage.setProcessName(this.getProcessName());
-        Function function = this.processEventUtil.getFunctionObj(newKafkaEventMessage);
-        if (TransientFunction.class.isAssignableFrom(function.getClass())) {
-            FunctionEvent executionResult = this.processEventExecuter
-                    .executeMessageAndDiscoverNextStep(newKafkaEventMessage);
+        newFunctionEvent.setProcessName(this.getProcessName());
+        if (TransientFunction.class.isAssignableFrom(processInstance.getFunction().getClass())) {
+            FunctionEvent executionResult = this.processEventExecuter.executeTransientFunction(newFunctionEvent,
+                    (TransientFunction) processInstance.getFunction());
             if (executionResult.getType() == FunctionEvent.Type.ERROR) {
                 throw new RuntimeException(executionResult.getData());
             }
-            return new ReadableControlImpl<T>(executionResult, processInstanceID.toString(), this.dataSerDes);
+            if (executionResult.getType() == Type.TRANSIENT || executionResult.getType() == Type.END) {
+                return new ReadableControlImpl<T>(executionResult, processInstanceID.toString(), this.dataSerDes);
+            } else {
+                newFunctionEvent = executionResult;
+            }
         }
-        String destinationTopic = this.topicResolver.resolveTopicName(newKafkaEventMessage.getType());
-        this.sendEventAndWait(destinationTopic, null, newKafkaEventMessage);
+        String destinationTopic = this.topicResolver.resolveTopicName(newFunctionEvent.getType());
+        this.sendEventAndWait(destinationTopic, null, newFunctionEvent);
         return new ReadableControlImpl<T>(null, processInstanceID.toString(), this.dataSerDes);
     }
 

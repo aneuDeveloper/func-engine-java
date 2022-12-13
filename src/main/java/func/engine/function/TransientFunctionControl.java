@@ -40,6 +40,7 @@ public class TransientFunctionControl<T> implements TransientFunction.WorkflowCo
         nextFunction.setComingFromId(this.sourceFunctionEvent.getId());
         nextFunction.setProcessInstanceID(this.sourceFunctionEvent.getProcessInstanceID());
         nextFunction.setRetryCount(0);
+        nextFunction.setType(FunctionEvent.Type.TRANSIENT);
         this.workflow.getProcessEventUtil().setFunction(nextFunction, function);
         String dataAsString = this.workflow.getDataSerDes().serialize(this.data);
         nextFunction.setData(dataAsString);

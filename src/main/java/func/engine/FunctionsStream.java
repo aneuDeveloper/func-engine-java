@@ -52,6 +52,7 @@ public class FunctionsStream<T> {
 
         stream.filter((key, value) -> this.shouldExecuteFuntion(key, value)) //
                 .mapValues(this.processEventExecuter::executeMessageAndDiscoverNextStep) //
+                // .filter(null) // filter transient messages
                 .transform(() -> this.createTransformer(), new String[0]) //
                 .selectKey((key, functionEvent) -> this.selectTopicKey(key, functionEvent))
                 .to((key, functionEvent, recordContext) -> this.toTopic(key, functionEvent, recordContext),

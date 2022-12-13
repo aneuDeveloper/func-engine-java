@@ -27,6 +27,7 @@ import func.engine.function.StatefulFunction;
 import func.engine.function.StatefulFunctionControl;
 import func.engine.function.TransientFunction;
 import func.engine.function.TransientFunctionControl;
+import func.engine.function.FunctionEvent.Type;
 
 public class FunctionExecuter<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FunctionExecuter.class);
@@ -67,27 +68,21 @@ public class FunctionExecuter<T> {
         return endEvent;
     }
 
-    private FunctionEvent executeMessage(FunctionEvent functionEvent) throws InterruptedException, ExecutionException {
+    protected FunctionEvent executeMessage(FunctionEvent functionEvent) throws InterruptedException, ExecutionException {
         Function function = this.functionWorkflow.getProcessEventUtil().getFunctionObj(functionEvent);
-        if (functionEvent.getType() == null || functionEvent.getType() == FunctionEvent.Type.WORKFLOW) {
-            if (StatefulFunction.class.isAssignableFrom(function.getClass())) {
-                LOGGER.trace("Execute stateful function id={} functionId={} function={}", new Object[] {
-                        functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
-                return this.executeStatefulFunction(functionEvent, (StatefulFunction<T>) function);
-            }
-            if (TransientFunction.class.isAssignableFrom(function.getClass())) {
-                LOGGER.trace("Execute transient function id={} functionId={} function={}", new Object[] {
-                        functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
-                return this.executeTransientFunction(functionEvent, (TransientFunction<T>) function);
-            }
-            if (StatefulAsyncFunction.class.isAssignableFrom(function.getClass())) {
-                LOGGER.trace("Execute async function id={} functionId={} function={}", new Object[] {
-                        functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
-                return this.executeStatefulAsyncFunction(functionEvent, (StatefulAsyncFunction<T>) function);
-            }
+        if (TransientFunction.class.isAssignableFrom(function.getClass())) {
+            LOGGER.trace("Execute transient function id={} functionId={} function={}", new Object[] {
+                    functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
+            return this.executeTransientFunction(functionEvent, (TransientFunction<T>) function);
         }
-        throw new IllegalStateException(String.format("Could not execute function id=%s functionId=%s function=%s.",
-                functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction()));
+        if (StatefulAsyncFunction.class.isAssignableFrom(function.getClass())) {
+            LOGGER.trace("Execute async function id={} functionId={} function={}", new Object[] {
+                    functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
+            return this.executeStatefulAsyncFunction(functionEvent, (StatefulAsyncFunction<T>) function);
+        }
+        LOGGER.trace("Execute stateful function id={} functionId={} function={}", new Object[] {
+                functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
+        return this.executeStatefulFunction(functionEvent, (StatefulFunction<T>) function);
     }
 
     private FunctionEvent executeStatefulFunction(FunctionEvent functionEvent, StatefulFunction<T> function) {
@@ -100,24 +95,21 @@ public class FunctionExecuter<T> {
         return result;
     }
 
-    private FunctionEvent executeTransientFunction(FunctionEvent functionEvent, TransientFunction<T> function)
+    protected FunctionEvent executeTransientFunction(FunctionEvent functionEvent, TransientFunction<T> function)
             throws InterruptedException, ExecutionException {
         TransientFunctionControl<T> processControl = new TransientFunctionControl<T>(functionEvent,
                 this.functionWorkflow);
+        FunctionEvent result = function.work(processControl);
         this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FunctionEvent.Type.TRANSIENT), null,
                 functionEvent);
-        FunctionEvent result = function.work(processControl);
         if (result == null) {
             FunctionEvent endEvent = this.createEndEvent(functionEvent, processControl.getData());
             this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FunctionEvent.Type.TRANSIENT), null,
                     endEvent);
             return endEvent;
         }
-        if (result.getType() == FunctionEvent.Type.WORKFLOW && TransientFunction.class
-                .isAssignableFrom(this.functionWorkflow.getProcessEventUtil().getFunctionObj(result).getClass())) {
+        if (result.getType() == Type.TRANSIENT) {
             result = this.executeMessage(result);
-        } else {
-            this.functionWorkflow.sendEvent(result);
         }
         return result;
     }
