@@ -45,7 +45,6 @@ public class FunctionEvent {
     private int retryCount;
     private String sourceTopic;
     private CorrelationState correlationState;
-    // private String data = "";
     
     private volatile String correlationId;
     private volatile Function functionObj;
@@ -127,14 +126,6 @@ public class FunctionEvent {
     public void setCorrelationId(String correlationId) {
         this.correlationId = correlationId;
     }
-
-    // public String getData() {
-    //     return this.data;
-    // }
-
-    // public void setData(String data) {
-    //     this.data = data;
-    // }
 
     public String getFunction() {
         return this.function;
