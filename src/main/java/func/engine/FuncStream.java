@@ -50,7 +50,7 @@ public class FuncStream<T> {
         KStream<String, FuncEvent<T>> stream = streamsBuilder.stream(topics,
                 Consumed.with(Serdes.String(), processEventSerde));
 
-        stream.filter((key, value) -> this.shouldExecuteFuntion(key, value)) //
+        stream.filter(this::shouldExecuteFuntion) //
                 .mapValues(this.processEventExecuter::executeMessageAndDiscoverNextStep) //
                 // .filter(null) // filter transient messages
                 .transform(() -> this.createTransformer(), new String[0]) //

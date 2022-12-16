@@ -97,7 +97,7 @@ public class FuncExecuter<T> {
         if (result.getType() == Type.TRANSIENT) {
             result = this.executeMessage(result);
         } else if (result.getType() == Type.RETRY) {
-            // wait in case of transient for retry
+            // TODO: wait in case of transient for retry
         }
         return result;
     }
