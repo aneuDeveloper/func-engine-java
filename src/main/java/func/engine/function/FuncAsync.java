@@ -10,9 +10,26 @@
 */
 package func.engine.function;
 
-public interface FunctionContextSerDes<T> {
-    public String serialize(T var1);
+import func.engine.correlation.CorrelationState;
 
-    public T deserialize(String var1);
+public interface FuncAsync<T> extends Func<T> {
+    public FuncEvent<T> start(FuncEvent<T> functionEvent);
+
+    public FuncEvent<T> continueFunction(FuncEvent<T> functionEvent);
+
+    default FuncEvent<T> createCorrelation(FuncEvent<T> functionEvent, String correlationId) {
+        if (correlationId == null) {
+            throw new IllegalStateException("CorrelationId must be specified.");
+        }
+        FuncEvent<T> correlation = FuncEventUtil.createWithDefaultValues();
+        correlation.setProcessName(functionEvent.getProcessName());
+        correlation.setProcessInstanceID(functionEvent.getProcessInstanceID());
+        correlation.setType(FuncEvent.Type.CORRELATION);
+        correlation.setCorrelationState(CorrelationState.INITIALIZED);
+        correlation.setCorrelationId(correlationId);
+        correlation.setFunction(functionEvent.getFunction());
+        correlation.setComingFromId(functionEvent.getId());
+        correlation.setContext(functionEvent.getContext());
+        return correlation;
+    }
 }
-

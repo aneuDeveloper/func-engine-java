@@ -14,14 +14,14 @@ import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.processor.ProcessorContext;
 
-public abstract class FunctionEventTransformer implements Transformer<String, FunctionEvent, KeyValue<String, FunctionEvent>> {
+public abstract class FuncEventTransformer<T> implements Transformer<String, FuncEvent<T>, KeyValue<String, FuncEvent<T>>> {
     protected ProcessorContext context;
 
     public void init(ProcessorContext context) {
         this.context = context;
     }
 
-    public abstract KeyValue<String, FunctionEvent> transform(String key, FunctionEvent functionEvent);
+    public abstract KeyValue<String, FuncEvent<T>> transform(String key, FuncEvent<T> functionEvent);
 
     public void close() {
     }

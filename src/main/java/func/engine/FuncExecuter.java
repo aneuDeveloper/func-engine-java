@@ -16,88 +16,81 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import func.engine.correlation.CorrelationState;
-import func.engine.function.Function;
-import func.engine.function.FunctionEvent;
-import func.engine.function.FunctionEvent.Type;
-import func.engine.function.FunctionEventUtil;
-import func.engine.function.StatefulAsyncFunction;
-import func.engine.function.StatefulAsyncFunctionControl;
-import func.engine.function.StatefulFunction;
-import func.engine.function.StatefulFunctionControl;
+import func.engine.function.IFunc;
+import func.engine.function.FuncEvent;
+import func.engine.function.FuncEvent.Type;
+import func.engine.function.FuncEventUtil;
+import func.engine.function.FuncAsync;
+import func.engine.function.Func;
 
-public class FunctionExecuter<T> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FunctionExecuter.class);
-    private FunctionsWorkflow<T> functionWorkflow;
+public class FuncExecuter<T> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FuncExecuter.class);
+    private FuncWorkflow<T> functionWorkflow;
     private TopicResolver topicResolver;
 
-    public FunctionExecuter(FunctionsWorkflow<T> functionWorkflow) {
+    public FuncExecuter(FuncWorkflow<T> functionWorkflow) {
         this.functionWorkflow = functionWorkflow;
         this.topicResolver = this.functionWorkflow.getTopicResolver();
     }
 
-    public FunctionEvent executeMessageAndDiscoverNextStep(FunctionEvent functionEvent) {
+    public FuncEvent<T> executeMessageAndDiscoverNextStep(FuncEvent<T> functionEvent) {
         try {
-            FunctionEvent nextFunctionEvent = this.executeMessage(functionEvent);
+            FuncEvent<T> nextFunctionEvent = this.executeMessage(functionEvent);
             return nextFunctionEvent;
         } catch (Throwable e) {
-            FunctionEvent nextFunction = FunctionEventUtil.createWithDefaultValues();
+            FuncEvent<T> nextFunction = FuncEventUtil.createWithDefaultValues();
             nextFunction.setProcessName(functionEvent.getProcessName());
             nextFunction.setComingFromId(functionEvent.getId());
             nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
-            nextFunction.setType(FunctionEvent.Type.ERROR);
-            nextFunction.setFunctionData(e);
+            nextFunction.setType(FuncEvent.Type.ERROR);
+            nextFunction.setError(e);
             return nextFunction;
         }
     }
 
-    private FunctionEvent createEndEvent(FunctionEvent functionEvent, T data) {
-        FunctionEvent endEvent = FunctionEventUtil.createWithDefaultValues();
+    private FuncEvent<T> createEndEvent(FuncEvent<T> functionEvent) {
+        FuncEvent<T> endEvent = FuncEventUtil.createWithDefaultValues();
         endEvent.setProcessName(functionEvent.getProcessName());
-        endEvent.setType(FunctionEvent.Type.END);
+        endEvent.setType(FuncEvent.Type.END);
         endEvent.setProcessInstanceID(functionEvent.getProcessInstanceID());
         endEvent.setComingFromId(functionEvent.getId());
-        endEvent.setFunctionData(data);
         return endEvent;
     }
 
-    protected FunctionEvent executeMessage(FunctionEvent functionEvent)
+    protected FuncEvent<T> executeMessage(FuncEvent<T> functionEvent)
             throws InterruptedException, ExecutionException {
-        Function function = this.functionWorkflow.getProcessEventUtil().getFunctionObj(functionEvent);
-        if (functionEvent.getType() == FunctionEvent.Type.TRANSIENT) {
+        IFunc function = this.functionWorkflow.getProcessEventUtil().getFunctionObj(functionEvent);
+        if (functionEvent.getType() == FuncEvent.Type.TRANSIENT) {
             LOGGER.trace("Execute transient function id={} functionId={} function={}", new Object[] {
                     functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
-            return this.executeTransientFunction(functionEvent, (StatefulFunction<T>) function);
+            return this.executeTransientFunction(functionEvent, (Func<T>) function);
         }
-        if (StatefulAsyncFunction.class.isAssignableFrom(function.getClass())) {
+        if (FuncAsync.class.isAssignableFrom(function.getClass())) {
             LOGGER.trace("Execute async function id={} functionId={} function={}", new Object[] {
                     functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
-            return this.executeStatefulAsyncFunction(functionEvent, (StatefulAsyncFunction<T>) function);
+            return this.executeStatefulAsyncFunction(functionEvent, (FuncAsync<T>) function);
         }
         LOGGER.trace("Execute stateful function id={} functionId={} function={}", new Object[] {
                 functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
-        return this.executeStatefulFunction(functionEvent, (StatefulFunction<T>) function);
+        return this.executeStatefulFunction(functionEvent, (Func<T>) function);
     }
 
-    private FunctionEvent executeStatefulFunction(FunctionEvent functionEvent, StatefulFunction<T> function) {
-        StatefulFunctionControl<T> processControl = new StatefulFunctionControl<T>(functionEvent,
-                this.functionWorkflow);
-        FunctionEvent result = function.work(processControl);
+    private FuncEvent<T> executeStatefulFunction(FuncEvent<T> functionEvent, Func<T> function) {
+        FuncEvent<T> result = function.work(functionEvent);
         if (result == null) {
-            return this.createEndEvent(functionEvent, processControl.getData());
+            return this.createEndEvent(functionEvent);
         }
         return result;
     }
 
-    protected FunctionEvent executeTransientFunction(FunctionEvent functionEvent, StatefulFunction<T> function)
+    protected FuncEvent<T> executeTransientFunction(FuncEvent<T> functionEvent, Func<T> function)
             throws InterruptedException, ExecutionException {
-        StatefulFunctionControl<T> processControl = new StatefulFunctionControl<T>(functionEvent,
-                this.functionWorkflow);
-        FunctionEvent result = function.work(processControl);
-        this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FunctionEvent.Type.TRANSIENT), null,
+        FuncEvent<T> result = function.work(functionEvent);
+        this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT), null,
                 functionEvent);
         if (result == null) {
-            FunctionEvent endEvent = this.createEndEvent(functionEvent, processControl.getData());
-            this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FunctionEvent.Type.TRANSIENT), null,
+            FuncEvent<T> endEvent = this.createEndEvent(functionEvent);
+            this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT), null,
                     endEvent);
             return endEvent;
         }
@@ -109,12 +102,10 @@ public class FunctionExecuter<T> {
         return result;
     }
 
-    private FunctionEvent executeStatefulAsyncFunction(FunctionEvent functionEvent, StatefulAsyncFunction<T> function)
+    private FuncEvent<T> executeStatefulAsyncFunction(FuncEvent<T> functionEvent, FuncAsync<T> function)
             throws InterruptedException, ExecutionException {
         if (functionEvent.getCorrelationState() == null) {
-            StatefulAsyncFunctionControl<T> functionControl = new StatefulAsyncFunctionControl<T>(functionEvent,
-                    this.functionWorkflow);
-            FunctionEvent correlationEvent = function.start(functionControl);
+            FuncEvent<T> correlationEvent = function.start(functionEvent);
             if (correlationEvent == null) {
                 throw new IllegalStateException(
                         String.format("No correlation specified for processInstanceId=%s and functionId=%s",
@@ -123,11 +114,9 @@ public class FunctionExecuter<T> {
             return correlationEvent;
         }
         if (functionEvent.getCorrelationState() == CorrelationState.CALLBACK_FORWARDED) {
-            StatefulFunctionControl<T> processControl = new StatefulFunctionControl<T>(functionEvent,
-                    this.functionWorkflow);
-            FunctionEvent result = function.continueFunction(processControl);
+            FuncEvent<T> result = function.continueFunction(functionEvent);
             if (result == null) {
-                return this.createEndEvent(functionEvent, processControl.getData());
+                return this.createEndEvent(functionEvent);
             }
             return result;
         }

@@ -22,22 +22,22 @@ import org.slf4j.LoggerFactory;
 
 import func.engine.correlation.CorrelationState;
 
-public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FunctionEventDeserializer.class);
-    private FunctionContextSerDes<FunctionEvent> serDes;
+public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FuncEventDeserializer.class);
+    private FuncContextSerDes<T> serDes;
 
-    public FunctionEvent deserialize(String topic, byte[] data) {
+    public FuncEvent<T> deserialize(String topic, byte[] data) {
         String dataAsString = new String(data);
-        FunctionEvent functionEvent = this.deserialize(dataAsString);
+        FuncEvent<T> functionEvent = this.deserialize(dataAsString);
         return functionEvent;
     }
 
-    public FunctionEvent deserialize(String messageAsString) {
+    public FuncEvent<T> deserialize(String messageAsString) {
         int indexOfEnd = messageAsString.indexOf("$e%,");
         String metadata = this.getMetaData(messageAsString, indexOfEnd);
         String clientData = messageAsString.substring(indexOfEnd + 4, messageAsString.length());
-        FunctionEvent functionEvent = FunctionEventUtil.createWithDefaultValues();
-        functionEvent.setFunctionData(serDes.deserialize(clientData));
+        FuncEvent<T> functionEvent = FuncEventUtil.createWithDefaultValues();
+        functionEvent.setContext(serDes.deserialize(clientData));
         this.populateVariables(functionEvent, metadata);
         return functionEvent;
     }
@@ -46,7 +46,7 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
         return data.substring(0, indexOfEnd);
     }
 
-    private void populateVariables(FunctionEvent functionEvent, String metadata) {
+    private void populateVariables(FuncEvent<T> functionEvent, String metadata) {
         for (String variable : metadata.split(",")) {
             String[] keyValuePair = variable.split("=");
             if (keyValuePair.length <= 1) {
@@ -83,7 +83,7 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
                 }
                 case "func_type": {
                     try {
-                        functionEvent.setType(FunctionEvent.Type.valueOf(keyValuePair[1]));
+                        functionEvent.setType(FuncEvent.Type.valueOf(keyValuePair[1]));
                     } catch (Exception e) {
                         LOGGER.error("Unknown FunctionEvent.Type=" + keyValuePair[1]);
                     }
@@ -109,7 +109,7 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
                                 "Could not parse NextRetryAt=" + keyValuePair[1] + " trying to parse other dateformet.",
                                 e);
                         try {
-                            Date parsedNextRetryAt = FunctionEventSerializer.DATE_FORMAT.parse(keyValuePair[1]);
+                            Date parsedNextRetryAt = FuncEventSerializer.DATE_FORMAT.parse(keyValuePair[1]);
                             ZoneId id = ZoneId.systemDefault();
                             ZonedDateTime ofInstant = ZonedDateTime.ofInstant(parsedNextRetryAt.toInstant(), id);
                             functionEvent.setNextRetryAt(ofInstant);
@@ -139,11 +139,7 @@ public class FunctionEventDeserializer implements Deserializer<FunctionEvent> {
         }
     }
 
-    public FunctionContextSerDes<FunctionEvent> getSerDes() {
-        return serDes;
-    }
-
-    public void setSerDes(FunctionContextSerDes<FunctionEvent> serDes) {
+    public void setSerDes(FuncContextSerDes<T> serDes) {
         this.serDes = serDes;
     }
 }

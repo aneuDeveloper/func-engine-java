@@ -25,32 +25,31 @@ import org.apache.kafka.streams.processor.RecordContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import func.engine.FunctionsWorkflow;
-import func.engine.function.FunctionContextSerDes;
-import func.engine.function.FunctionEvent;
-import func.engine.function.FunctionEventUtil;
+import func.engine.FuncWorkflow;
+import func.engine.function.FuncEvent;
+import func.engine.function.FuncEventUtil;
 
 public class CorrelationStream<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(CorrelationStream.class);
-    private FunctionsWorkflow<T> processDefinition;
+    private FuncWorkflow<T> processDefinition;
     private KafkaStreams stream;
 
-    public CorrelationStream(FunctionsWorkflow<T> processDefinition) {
+    public CorrelationStream(FuncWorkflow<T> processDefinition) {
         this.processDefinition = processDefinition;
     }
 
     public void startStreaming() {
         StreamsBuilder streamsBuilder = new StreamsBuilder();
-        Serde<FunctionEvent> processEventSerde = this.processDefinition.getSerde();
-        String callbackTopic = this.processDefinition.getTopicResolver().resolveTopicName(FunctionEvent.Type.CALLBACK);
+        Serde<FuncEvent<T>> processEventSerde = this.processDefinition.getSerde();
+        String callbackTopic = this.processDefinition.getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK);
 
-        KStream<String, FunctionEvent> callbackStream = streamsBuilder.stream(callbackTopic,
+        KStream<String, FuncEvent<T>> callbackStream = streamsBuilder.stream(callbackTopic,
                 Consumed.with(Serdes.String(), processEventSerde));
 
         String correlationTopic = this.processDefinition.getTopicResolver()
-                .resolveTopicName(FunctionEvent.Type.CORRELATION);
+                .resolveTopicName(FuncEvent.Type.CORRELATION);
 
-        KTable<String, FunctionEvent> correlationTable = streamsBuilder.table(correlationTopic,
+        KTable<String, FuncEvent<T>> correlationTable = streamsBuilder.table(correlationTopic,
                 Consumed.with(Serdes.String(), processEventSerde));
 
         callbackStream.join(correlationTable, this::mergeValues) //
@@ -62,37 +61,39 @@ public class CorrelationStream<T> {
         this.stream.start();
     }
 
-    private FunctionEvent mergeValues(final FunctionEvent callbackProcessEvent,
-            final FunctionEvent correlationProcessEvent) {
+    private FuncEvent<T> mergeValues(final FuncEvent<T> callbackProcessEvent,
+            final FuncEvent<T> correlationProcessEvent) {
         try {
-            FunctionEvent callbackReceivedMessage = FunctionEventUtil.createWithDefaultValues();
+            FuncEvent<T> callbackReceivedMessage = FuncEventUtil.createWithDefaultValues();
             callbackReceivedMessage.setProcessName(correlationProcessEvent.getProcessName());
             callbackReceivedMessage.setFunction(correlationProcessEvent.getFunction());
             callbackReceivedMessage.setProcessInstanceID(correlationProcessEvent.getProcessInstanceID());
             callbackReceivedMessage.setComingFromId(correlationProcessEvent.getId());
             callbackReceivedMessage.setCorrelationState(CorrelationState.CALLBACK_FORWARDED);
-            callbackReceivedMessage.setType(FunctionEvent.Type.WORKFLOW);
-            FunctionContextSerDes<T> dataSerDes = this.processDefinition.getDataSerDes();
-            T callbackData = dataSerDes.deserialize(callbackProcessEvent.getFunctionData());
-            T originalData = dataSerDes.deserialize(correlationProcessEvent.getFunctionData());
+            callbackReceivedMessage.setType(FuncEvent.Type.WORKFLOW);
+            
+            // FunctionContextSerDes<T> dataSerDes = this.processDefinition.getDataSerDes();
+            // T callbackData = dataSerDes.deserialize(callbackProcessEvent.getContext());
+            // T originalData = dataSerDes.deserialize(correlationProcessEvent.getContext());
+
             if (this.processDefinition.getCorrelationMerger() == null) {
                 throw new IllegalStateException(
                         "Correlation merger has not been defined. Please define the merger through configuration with this property correlation.merger.class");
             }
-            T mergedValue = this.processDefinition.getCorrelationMerger().mergeCorrelation(callbackData, originalData,
+            T mergedValue = this.processDefinition.getCorrelationMerger().mergeCorrelation(callbackProcessEvent.getContext(), correlationProcessEvent.getContext(),
                     new CorrelationContext() {
 
                         @Override
-                        public FunctionEvent getCorrelationEvent() {
+                        public FuncEvent getCorrelationEvent() {
                             return correlationProcessEvent;
                         }
 
                         @Override
-                        public FunctionEvent getCallbackEvent() {
+                        public FuncEvent getCallbackEvent() {
                             return callbackProcessEvent;
                         }
                     });
-            callbackReceivedMessage.setFunctionData(mergedValue);
+            callbackReceivedMessage.setContext(mergedValue);
             return callbackReceivedMessage;
         } catch (Exception e) {
             LOGGER.error(e.getMessage(), e);
@@ -100,7 +101,7 @@ public class CorrelationStream<T> {
         }
     }
 
-    private String selectDestinationTopic(String key, FunctionEvent functionEvent, RecordContext recordContext) {
+    private String selectDestinationTopic(String key, FuncEvent<T> functionEvent, RecordContext recordContext) {
         try {
             String destinationTopic = this.processDefinition.getTopicResolver()
                     .resolveTopicName(functionEvent.getType());

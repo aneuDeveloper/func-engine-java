@@ -10,26 +10,26 @@
 */
 package func.engine;
 
-import func.engine.function.Function;
+import func.engine.function.IFunc;
 
 public class WorkflowStart<T> {
-    private T data;
-    protected Function function;
+    private T context;
+    protected IFunc function;
     private boolean transientFunction;
 
-    public T getData() {
-        return this.data;
+    public T getContext() {
+        return this.context;
     }
 
-    public void setData(T data) {
-        this.data = data;
+    public void setContext(T data) {
+        this.context = data;
     }
 
-    public Function getFunction() {
+    public IFunc getFunction() {
         return this.function;
     }
 
-    public void setFunction(Function function) {
+    public void setFunction(IFunc function) {
         this.function = function;
     }
 

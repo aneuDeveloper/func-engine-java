@@ -16,37 +16,37 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FunctionEventUtil {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FunctionEventUtil.class);
-    private FunctionSerDes functionSerDes;
+public class FuncEventUtil {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FuncEventUtil.class);
+    private FuncSerDes functionSerDes;
 
-    public FunctionEventUtil(FunctionSerDes functionSerDes) {
+    public FuncEventUtil(FuncSerDes functionSerDes) {
         this.functionSerDes = functionSerDes;
     }
 
-    public static FunctionEvent createWithDefaultValues() {
-        FunctionEvent functionEvent = new FunctionEvent("1", UUID.randomUUID().toString());
+    public static <T> FuncEvent<T> createWithDefaultValues() {
+        FuncEvent<T> functionEvent = new FuncEvent<T>("1", UUID.randomUUID().toString());
         functionEvent.setTimeStamp(ZonedDateTime.now());
         return functionEvent;
     }
 
-    public void setFunction(FunctionEvent functionEvent, Function function) {
+    public void setFunction(FuncEvent functionEvent, IFunc function) {
         functionEvent.setFunctionObj(function);
         String functionName = this.functionSerDes.serialize(function);
         functionEvent.setFunction(functionName);
     }
 
-    public void configureFunctionByFunctionName(FunctionEvent functionEvent) {
-        Function functionObj = this.functionSerDes.deserialize(functionEvent);
+    public void configureFunctionByFunctionName(FuncEvent functionEvent) {
+        IFunc functionObj = this.functionSerDes.deserialize(functionEvent);
         functionEvent.setFunctionObj(functionObj);
     }
 
-    public Function getFunctionObj(FunctionEvent functionEvent) {
+    public IFunc getFunctionObj(FuncEvent functionEvent) {
         if (functionEvent.getFunctionObj() != null) {
             return functionEvent.getFunctionObj();
         }
         if (functionEvent.getFunction() != null) {
-            Function functionObj = this.functionSerDes.deserialize(functionEvent);
+            IFunc functionObj = this.functionSerDes.deserialize(functionEvent);
             functionEvent.setFunctionObj(functionObj);
             this.setFunction(functionEvent, functionObj);
             return functionEvent.getFunctionObj();

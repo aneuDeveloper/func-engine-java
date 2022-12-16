@@ -10,6 +10,9 @@
 */
 package func.engine.function;
 
-public interface Function {
+public interface FuncContextSerDes<T> {
+    public String serialize(T context);
+
+    public T deserialize(String context);
 }
 

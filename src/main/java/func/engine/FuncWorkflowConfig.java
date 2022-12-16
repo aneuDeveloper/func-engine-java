@@ -16,13 +16,13 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
-import func.engine.function.FunctionEventDeserializer;
-import func.engine.function.FunctionEventSerializer;
+import func.engine.function.FuncEventDeserializer;
+import func.engine.function.FuncEventSerializer;
 
-public class FunctionsWorkflowConfig<T> {
-    private FunctionsWorkflow<T> processDefinition;
+public class FuncWorkflowConfig<T> {
+    private FuncWorkflow<T> processDefinition;
 
-    public FunctionsWorkflowConfig(FunctionsWorkflow<T> processDefinition) {
+    public FuncWorkflowConfig(FuncWorkflow<T> processDefinition) {
         this.processDefinition = processDefinition;
     }
 
@@ -38,7 +38,7 @@ public class FunctionsWorkflowConfig<T> {
         producerProperties.setProperty("max.block.ms", "60000");
         producerProperties.setProperty("linger.ms", "20");
         producerProperties.setProperty("batch.size", Integer.toString(32768));
-        producerProperties.put("value.serializer", FunctionEventSerializer.class.getName());
+        producerProperties.put("value.serializer", FuncEventSerializer.class.getName());
         return producerProperties;
     }
 
@@ -46,7 +46,7 @@ public class FunctionsWorkflowConfig<T> {
         Properties consumerProperties = new Properties();
         consumerProperties.setProperty("bootstrap.servers", this.processDefinition.getProperty("bootstrap.servers"));
         consumerProperties.setProperty("key.deserializer", StringDeserializer.class.getName());
-        consumerProperties.setProperty("value.deserializer", FunctionEventDeserializer.class.getName());
+        consumerProperties.setProperty("value.deserializer", FuncEventDeserializer.class.getName());
         consumerProperties.setProperty("group.id", groupId);
         consumerProperties.setProperty("enable.auto.commit", "false");
         consumerProperties.setProperty("max.poll.records", "1");

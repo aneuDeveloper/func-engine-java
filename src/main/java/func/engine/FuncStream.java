@@ -26,16 +26,16 @@ import org.apache.kafka.streams.processor.RecordContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import func.engine.function.FunctionEvent;
-import func.engine.function.FunctionEventTransformer;
+import func.engine.function.FuncEvent;
+import func.engine.function.FuncEventTransformer;
 
-public class FunctionsStream<T> {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FunctionsStream.class);
-    private FunctionsWorkflow<T> processDefinition;
+public class FuncStream<T> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FuncStream.class);
+    private FuncWorkflow<T> processDefinition;
     private KafkaStreams streams;
-    private FunctionExecuter<T> processEventExecuter;
+    private FuncExecuter<T> processEventExecuter;
 
-    public FunctionsStream(FunctionsWorkflow<T> processDefinition, FunctionExecuter<T> processEventExecuter) {
+    public FuncStream(FuncWorkflow<T> processDefinition, FuncExecuter<T> processEventExecuter) {
         this.processDefinition = processDefinition;
         this.processEventExecuter = processEventExecuter;
     }
@@ -45,9 +45,9 @@ public class FunctionsStream<T> {
             throw new IllegalStateException("Cannot start workflow without any topics to observe.");
         }
         LOGGER.info("Starting workflow stream for following topics: {}", topics.toString());
-        Serde<FunctionEvent> processEventSerde = this.processDefinition.getSerde();
+        Serde<FuncEvent<T>> processEventSerde = this.processDefinition.getSerde();
         StreamsBuilder streamsBuilder = new StreamsBuilder();
-        KStream<String, FunctionEvent> stream = streamsBuilder.stream(topics,
+        KStream<String, FuncEvent<T>> stream = streamsBuilder.stream(topics,
                 Consumed.with(Serdes.String(), processEventSerde));
 
         stream.filter((key, value) -> this.shouldExecuteFuntion(key, value)) //
@@ -63,39 +63,39 @@ public class FunctionsStream<T> {
         this.streams.start();
     }
 
-    private boolean shouldExecuteFuntion(String key, FunctionEvent value) {
-        boolean shouldExecute = (value.getType() == null || value.getType() == FunctionEvent.Type.WORKFLOW)
+    private boolean shouldExecuteFuntion(String key, FuncEvent<T> value) {
+        boolean shouldExecute = (value.getType() == null || value.getType() == FuncEvent.Type.WORKFLOW)
                 && value.getFunction() != null && !value.getFunction().isBlank();
         return shouldExecute;
     }
 
     private Properties prepareProperties(String topicName) {
         Properties properties = this.processDefinition.getServiceConfig().getWorkflowStreamProperties();
-        String applicationNamePrefix = this.processDefinition.getProperty(FunctionsWorkflow.WORKFLOW_STREAM_PREFIX,
+        String applicationNamePrefix = this.processDefinition.getProperty(FuncWorkflow.WORKFLOW_STREAM_PREFIX,
                 this.processDefinition.getProcessName());
         properties.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationNamePrefix + "-" + topicName);
         return properties;
     }
 
-    private FunctionEventTransformer createTransformer() {
-        return new FunctionEventTransformer() {
+    private FuncEventTransformer<T> createTransformer() {
+        return new FuncEventTransformer<T>() {
 
             @Override
-            public KeyValue<String, FunctionEvent> transform(String key, FunctionEvent functionEvent) {
+            public KeyValue<String, FuncEvent<T>> transform(String key, FuncEvent<T> functionEvent) {
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Message received: {}", new String(FunctionsStream.this.processDefinition
+                    LOGGER.trace("Message received: {}", new String(FuncStream.this.processDefinition
                             .getSerde().serializer().serialize(null, functionEvent)));
                 }
                 if (functionEvent.getNextRetryAt() != null) {
                     functionEvent.setSourceTopic(this.context.topic());
                 }
-                return new KeyValue<String, FunctionEvent>(key, functionEvent);
+                return new KeyValue<String, FuncEvent<T>>(key, functionEvent);
             }
         };
     }
 
-    private String selectTopicKey(String key, FunctionEvent functionEvent) {
-        if (functionEvent.getType() == FunctionEvent.Type.CORRELATION) {
+    private String selectTopicKey(String key, FuncEvent<T> functionEvent) {
+        if (functionEvent.getType() == FuncEvent.Type.CORRELATION) {
             return functionEvent.getCorrelationId();
         }
         // TODO check if getId() is required by retries, probably not.
@@ -105,7 +105,7 @@ public class FunctionsStream<T> {
         return key;
     }
 
-    private String toTopic(String key, FunctionEvent functionEvent, RecordContext recordContext) {
+    private String toTopic(String key, FuncEvent<T> functionEvent, RecordContext recordContext) {
         String topic = this.processDefinition.getTopicResolver().resolveTopicName(functionEvent.getType());
         return topic;
     }

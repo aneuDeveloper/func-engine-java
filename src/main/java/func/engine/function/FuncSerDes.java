@@ -8,26 +8,10 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 */
-package func.engine;
+package func.engine.function;
 
-import func.engine.function.FunctionEvent;
+public interface FuncSerDes {
+    public IFunc deserialize(FuncEvent functionEvent);
 
-public class ReadableControlImpl<T> implements ReadableControl<T> {
-    private FunctionEvent functionEvent;
-    private String processInstanceId;
-
-    public ReadableControlImpl(FunctionEvent functionEvent, String processInstanceId) {
-        this.functionEvent = functionEvent;
-        this.processInstanceId = processInstanceId;
-    }
-
-    @Override
-    public String getProcessInstanceId() {
-        return this.processInstanceId;
-    }
-
-    @Override
-    public T getData() {
-        return this.functionEvent.getFunctionData();
-    }
+    public String serialize(IFunc function);
 }

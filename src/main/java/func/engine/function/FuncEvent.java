@@ -14,7 +14,7 @@ import java.time.ZonedDateTime;
 
 import func.engine.correlation.CorrelationState;
 
-public class FunctionEvent {
+public class FuncEvent<T> {
     public static enum Type {
         END, CORRELATION, CALLBACK, DEAD_LETTER, RETRY, WORKFLOW, TRANSIENT, ERROR;
     }
@@ -45,12 +45,13 @@ public class FunctionEvent {
     private int retryCount;
     private String sourceTopic;
     private CorrelationState correlationState;
-    
-    private volatile String correlationId;
-    private volatile Function functionObj;
-    private volatile Object functionData;
 
-    protected FunctionEvent(String version, String id) {
+    private volatile String correlationId;
+    private volatile IFunc functionObj;
+    private volatile T context;
+    private volatile Throwable error;
+
+    protected FuncEvent(String version, String id) {
         this.version = version;
         this.id = id;
     }
@@ -135,11 +136,11 @@ public class FunctionEvent {
         this.function = function;
     }
 
-    public Function getFunctionObj() {
+    public IFunc getFunctionObj() {
         return this.functionObj;
     }
 
-    public void setFunctionObj(Function functionObj) {
+    public void setFunctionObj(IFunc functionObj) {
         this.functionObj = functionObj;
     }
 
@@ -167,11 +168,19 @@ public class FunctionEvent {
         this.sourceTopic = sourceTopic;
     }
 
-    public <T> T  getFunctionData() {
-        return (T) functionData;
+    public T getContext() {
+        return context;
     }
 
-    public void setFunctionData(Object functionData) {
-        this.functionData = functionData;
+    public void setContext(T context) {
+        this.context = context;
+    }
+
+    public Throwable getError() {
+        return error;
+    }
+
+    public void setError(Throwable error) {
+        this.error = error;
     }
 }

@@ -10,7 +10,7 @@
 */
 package func.engine;
 
-import func.engine.function.FunctionEvent;
+import func.engine.function.FuncEvent;
 
 public class DefaultTopicResolver implements TopicResolver {
     private String prefix;
@@ -20,9 +20,9 @@ public class DefaultTopicResolver implements TopicResolver {
     }
 
     @Override
-    public String resolveTopicName(FunctionEvent.Type functionType) {
+    public String resolveTopicName(FuncEvent.Type functionType) {
         if (functionType == null) {
-            functionType = FunctionEvent.Type.WORKFLOW;
+            functionType = FuncEvent.Type.WORKFLOW;
         }
         switch (functionType) {
             case TRANSIENT:
@@ -34,7 +34,7 @@ public class DefaultTopicResolver implements TopicResolver {
                 return this.prefix + functionType.name();
             }
             default:
-                return this.prefix + FunctionEvent.Type.WORKFLOW.name();
+                return this.prefix + FuncEvent.Type.WORKFLOW.name();
         }
 
     }

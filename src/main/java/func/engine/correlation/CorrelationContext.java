@@ -10,11 +10,11 @@
 */
 package func.engine.correlation;
 
-import func.engine.function.FunctionEvent;
+import func.engine.function.FuncEvent;
 
 public interface CorrelationContext {
-    public FunctionEvent getCallbackEvent();
+    public FuncEvent getCallbackEvent();
 
-    public FunctionEvent getCorrelationEvent();
+    public FuncEvent getCorrelationEvent();
 }
 

@@ -10,9 +10,9 @@
 */
 package func.engine;
 
-import func.engine.function.FunctionEvent;
+import func.engine.function.FuncEvent;
 
 public interface TopicResolver {
-    public String resolveTopicName(FunctionEvent.Type eventType);
+    public String resolveTopicName(FuncEvent.Type eventType);
 }
 

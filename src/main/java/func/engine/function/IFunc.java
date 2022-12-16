@@ -10,21 +10,6 @@
 */
 package func.engine.function;
 
-import func.engine.ReadableControl;
-import func.engine.Retries;
-
-public interface StatefulAsyncFunction<T> extends Function {
-    public FunctionEvent start(WorkflowControlAsync<T> workflowControlAsync);
-
-    public FunctionEvent continueFunction(StatefulFunction.WorkflowControl<T> statefulFunctionControl);
-
-    public static interface WorkflowControlAsync<T> extends ReadableControl<T> {
-        public FunctionEvent createCorrelation(String uniqueId, long timeout);
-
-        public FunctionEvent retry(Retries... retries);
-
-        public FunctionEvent endWorkflow();
-
-        public FunctionEvent getSource();
-    }
+public interface IFunc {
 }
+
