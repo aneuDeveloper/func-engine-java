@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 import func.engine.correlation.CorrelationMerger;
 import func.engine.correlation.CorrelationState;
 import func.engine.correlation.CorrelationStream;
+import func.engine.correlation.DefaultCorrelationMerger;
 import func.engine.correlation.ProcessCorrelation;
 import func.engine.function.FuncContextSerDes;
 import func.engine.function.FuncEvent;
@@ -403,6 +404,9 @@ public class FuncWorkflow<T> {
     }
 
     public CorrelationMerger<T> getCorrelationMerger() {
+        if (correlationMerger == null) {
+            this.correlationMerger = new DefaultCorrelationMerger<T>();
+        }
         return this.correlationMerger;
     }
 
