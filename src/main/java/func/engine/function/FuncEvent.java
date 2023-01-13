@@ -11,6 +11,7 @@
 package func.engine.function;
 
 import java.time.ZonedDateTime;
+import java.util.UUID;
 
 import func.engine.correlation.CorrelationState;
 
@@ -54,6 +55,12 @@ public class FuncEvent<T> {
     protected FuncEvent(String version, String id) {
         this.version = version;
         this.id = id;
+    }
+
+    public static final <T> FuncEvent<T> createWithDefaultValues() {
+        FuncEvent<T> functionEvent = new FuncEvent<>("1", UUID.randomUUID().toString());
+        functionEvent.setTimeStamp(ZonedDateTime.now());
+        return functionEvent;
     }
 
     public String getVersion() {

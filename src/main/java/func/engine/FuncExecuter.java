@@ -16,12 +16,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import func.engine.correlation.CorrelationState;
-import func.engine.function.IFunc;
+import func.engine.function.Func;
+import func.engine.function.FuncAsync;
 import func.engine.function.FuncEvent;
 import func.engine.function.FuncEvent.Type;
-import func.engine.function.FuncEventUtil;
-import func.engine.function.FuncAsync;
-import func.engine.function.Func;
+import func.engine.function.IFunc;
 
 public class FuncExecuter<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncExecuter.class);
@@ -38,7 +37,7 @@ public class FuncExecuter<T> {
             FuncEvent<T> nextFunctionEvent = this.executeMessage(functionEvent);
             return nextFunctionEvent;
         } catch (Throwable e) {
-            FuncEvent<T> nextFunction = FuncEventUtil.createWithDefaultValues();
+            FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
             nextFunction.setProcessName(functionEvent.getProcessName());
             nextFunction.setComingFromId(functionEvent.getId());
             nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
@@ -49,7 +48,7 @@ public class FuncExecuter<T> {
     }
 
     private FuncEvent<T> createEndEvent(FuncEvent<T> functionEvent) {
-        FuncEvent<T> endEvent = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> endEvent = FuncEvent.createWithDefaultValues();
         endEvent.setProcessName(functionEvent.getProcessName());
         endEvent.setType(FuncEvent.Type.END);
         endEvent.setProcessInstanceID(functionEvent.getProcessInstanceID());
@@ -59,7 +58,7 @@ public class FuncExecuter<T> {
 
     protected FuncEvent<T> executeMessage(FuncEvent<T> functionEvent)
             throws InterruptedException, ExecutionException {
-        IFunc function = this.functionWorkflow.getProcessEventUtil().getFunctionObj(functionEvent);
+        IFunc function = this.getFunctionObj(functionEvent);
         if (functionEvent.getType() == FuncEvent.Type.TRANSIENT) {
             LOGGER.trace("Execute transient function id={} functionId={} function={}", new Object[] {
                     functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
@@ -73,6 +72,26 @@ public class FuncExecuter<T> {
         LOGGER.trace("Execute stateful function id={} functionId={} function={}", new Object[] {
                 functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
         return this.executeStatefulFunction(functionEvent, (Func<T>) function);
+    }
+
+    private IFunc getFunctionObj(FuncEvent functionEvent) {
+        if (functionEvent.getFunctionObj() != null) {
+            return functionEvent.getFunctionObj();
+        }
+        if (functionEvent.getFunction() != null) {
+            IFunc functionObj = this.functionWorkflow.getFuncSerDes().deserialize(functionEvent);
+            functionEvent.setFunctionObj(functionObj);
+            functionEvent.setFunctionObj(functionObj);
+            if (functionEvent.getFunction() == null) {
+                String functionName = this.functionWorkflow.getFuncSerDes().serialize(functionObj);
+                functionEvent.setFunction(functionName);
+            }
+            return functionEvent.getFunctionObj();
+        }
+        if (functionEvent.getFunctionObj() == null) {
+            LOGGER.error("Function object has not been defined and could not be deserialized for String represention.");
+        }
+        return functionEvent.getFunctionObj();
     }
 
     private FuncEvent<T> executeStatefulFunction(FuncEvent<T> functionEvent, Func<T> function) {

@@ -27,7 +27,6 @@ import org.slf4j.LoggerFactory;
 
 import func.engine.FuncWorkflow;
 import func.engine.function.FuncEvent;
-import func.engine.function.FuncEventUtil;
 
 public class CorrelationStream<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(CorrelationStream.class);
@@ -56,7 +55,7 @@ public class CorrelationStream<T> {
                 .to(this::selectDestinationTopic, Produced.with(Serdes.String(), processEventSerde));
 
         Topology topology = streamsBuilder.build();
-        Properties properties = this.processDefinition.getServiceConfig().getCorrelationStreamProperties();
+        Properties properties = this.getCorrelationStreamProperties();
         this.stream = new KafkaStreams(topology, properties);
         this.stream.start();
     }
@@ -64,7 +63,7 @@ public class CorrelationStream<T> {
     private FuncEvent<T> mergeValues(final FuncEvent<T> callbackProcessEvent,
             final FuncEvent<T> correlationProcessEvent) {
         try {
-            FuncEvent<T> callbackReceivedMessage = FuncEventUtil.createWithDefaultValues();
+            FuncEvent<T> callbackReceivedMessage = FuncEvent.createWithDefaultValues();
             callbackReceivedMessage.setProcessName(correlationProcessEvent.getProcessName());
             callbackReceivedMessage.setFunction(correlationProcessEvent.getFunction());
             callbackReceivedMessage.setProcessInstanceID(correlationProcessEvent.getProcessInstanceID());
@@ -115,5 +114,18 @@ public class CorrelationStream<T> {
     public void close() {
         LOGGER.info("Shutdown stream correlation stream.");
         this.stream.close();
+    }
+
+    private Properties getCorrelationStreamProperties() {
+        Properties properties = new Properties();
+        properties.put("application.id", this.processDefinition.getProperty("correlation.stream.application.name", this.processDefinition.getProcessName() + "-CorrelationStream"));
+        properties.put("bootstrap.servers", this.processDefinition.getProperty("bootstrap.servers"));
+        properties.put("auto.offset.reset", "earliest");
+        properties.put("default.key.serde", Serdes.String().getClass());
+        properties.put("num.stream.threads", this.processDefinition.getProperty("steps.num.stream.threads.config", "1"));
+        properties.put("processing.guarantee", "exactly_once_v2");
+        short replicationFactor = Short.valueOf(this.processDefinition.getProperty("topic.default.replication.factor", "1").toString());
+        properties.put("replication.factor", "" + replicationFactor);
+        return properties;
     }
 }

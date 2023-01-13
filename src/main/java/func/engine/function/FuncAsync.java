@@ -21,7 +21,7 @@ public interface FuncAsync<T> extends Func<T> {
         if (correlationId == null) {
             throw new IllegalStateException("CorrelationId must be specified.");
         }
-        FuncEvent<T> correlation = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> correlation = FuncEvent.createWithDefaultValues();
         correlation.setProcessName(functionEvent.getProcessName());
         correlation.setProcessInstanceID(functionEvent.getProcessInstanceID());
         correlation.setType(FuncEvent.Type.CORRELATION);

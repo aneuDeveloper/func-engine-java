@@ -70,7 +70,7 @@ public class FuncStream<T> {
     }
 
     private Properties prepareProperties(String topicName) {
-        Properties properties = this.processDefinition.getServiceConfig().getWorkflowStreamProperties();
+        Properties properties = this.getWorkflowStreamProperties();
         String applicationNamePrefix = this.processDefinition.getProperty(FuncWorkflow.WORKFLOW_STREAM_PREFIX,
                 this.processDefinition.getProcessName());
         properties.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationNamePrefix + "-" + topicName);
@@ -113,5 +113,19 @@ public class FuncStream<T> {
     public void close() {
         LOGGER.info("Shutdown workflow stream");
         this.streams.close();
+    }
+
+    private Properties getWorkflowStreamProperties() {
+        Properties properties = new Properties();
+        properties.put("bootstrap.servers", this.processDefinition.getProperty("bootstrap.servers"));
+        properties.put("auto.offset.reset", "earliest");
+        properties.put("default.key.serde", Serdes.String().getClass());
+        properties.put("num.stream.threads",
+                this.processDefinition.getProperty("steps.num.stream.threads.config", "1"));
+        properties.put("default.deserialization.exception.handler",
+                this.processDefinition.getProperty("default.deserialization.exception.handler",
+                        "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler"));
+        properties.put("processing.guarantee", "exactly_once_v2");
+        return properties;
     }
 }

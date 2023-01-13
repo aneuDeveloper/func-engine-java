@@ -36,7 +36,7 @@ public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
         int indexOfEnd = messageAsString.indexOf("$e%,");
         String metadata = this.getMetaData(messageAsString, indexOfEnd);
         String clientData = messageAsString.substring(indexOfEnd + 4, messageAsString.length());
-        FuncEvent<T> functionEvent = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> functionEvent = FuncEvent.createWithDefaultValues();
         functionEvent.setContext(serDes.deserialize(clientData));
         this.populateVariables(functionEvent, metadata);
         return functionEvent;

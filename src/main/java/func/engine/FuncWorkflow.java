@@ -10,7 +10,6 @@
 */
 package func.engine;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,6 +31,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,14 +40,13 @@ import func.engine.correlation.CorrelationState;
 import func.engine.correlation.CorrelationStream;
 import func.engine.correlation.DefaultCorrelationMerger;
 import func.engine.correlation.ProcessCorrelation;
+import func.engine.function.Func;
 import func.engine.function.FuncContextSerDes;
 import func.engine.function.FuncEvent;
 import func.engine.function.FuncEvent.Type;
 import func.engine.function.FuncEventDeserializer;
 import func.engine.function.FuncEventSerializer;
-import func.engine.function.FuncEventUtil;
 import func.engine.function.FuncSerDes;
-import func.engine.function.Func;
 
 public class FuncWorkflow<T> {
     private static final Logger LOG = LoggerFactory.getLogger(FuncWorkflow.class);
@@ -56,10 +55,6 @@ public class FuncWorkflow<T> {
     public static final String SYNCHRONOUS_WAITHANDLER_STEAM_APPLICATION_NAME = "synchronous.waithandler.stream.application.name";
     public static final String CORRELATION_STREAM_APPLICATION_NAME = "correlation.stream.application.name";
     public static final String WORKFLOW_STREAM_PREFIX = "workflow.stream.prefix";
-    public static final String CORRELATION_MERGER_CLASS = "correlation.merger.class";
-    public static final String DATA_SERDES_CLASS = "data.serdes.class";
-    public static final String FUNCTION_SERDES_OBJ = "function.serdes.obj";
-    public static final String FUNCTION_SERDES_CLASS = "function.serdes.class";
     public static final String TOPIC_DEFAULT_NUM_PARTITIONS = "topic.default.num.partitions";
     public static final String TOPIC_DEFAULT_REPLICATION_FACTOR = "topic.default.replication.factor";
     public static final String TOPIC_CORRELATION_RETENTION_MS = "topic.correlation.retention.ms";
@@ -68,18 +63,18 @@ public class FuncWorkflow<T> {
     public static final String CORRELATION_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
     public static final String DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG = "default.deserialization.exception.handler";
     public static final String TOPIC_RESOLVER_OBJ = "topic.resolver.obj";
-    private FuncWorkflowConfig<T> serviceConfig;
+
     private KafkaProducer<String, FuncEvent> kafkaProducer;
     private String processName;
     private CorrelationStream<T> correlationStream;
-    private List<FuncStream<T>> allWorkflowStreams;
+    private FuncStream<T> funcStream;
     private Properties properties;
-    private FuncContextSerDes<T> dataSerDes;
+    private FuncContextSerDes<T> funcContextSerDes;
+    private FuncSerDes funcSerDes;
     private CorrelationMerger<T> correlationMerger;
-    private FuncSerDes functionSerDes;
-    private FuncEventUtil processEventUtil;
     private TopicResolver topicResolver;
     private FuncExecuter<T> processEventExecuter;
+    private boolean startCorrelation = true;
 
     public FuncWorkflow(Properties properties) {
         if (properties == null) {
@@ -87,15 +82,8 @@ public class FuncWorkflow<T> {
         }
         this.properties = properties;
         this.processName = this.getProcessName(properties);
-        this.dataSerDes = this.getInstance(properties, DATA_SERDES_CLASS);
-        this.correlationMerger = this.getInstanceOptional(properties, CORRELATION_MERGER_CLASS);
-        this.functionSerDes = this.getFunctionSerDes(properties);
         this.topicResolver = this.createTopicResolver(properties);
-        this.processEventUtil = new FuncEventUtil(this.functionSerDes);
-        this.serviceConfig = new FuncWorkflowConfig<T>(this);
-        this.correlationStream = new CorrelationStream<T>(this);
         this.processEventExecuter = new FuncExecuter<T>(this);
-        this.startEngine();
     }
 
     private TopicResolver createTopicResolver(Properties properties) {
@@ -110,14 +98,6 @@ public class FuncWorkflow<T> {
         return this.topicResolver;
     }
 
-    private FuncSerDes getFunctionSerDes(Properties properties) {
-        Object functionSerDesObj = properties.get(FUNCTION_SERDES_OBJ);
-        if (functionSerDesObj != null && FuncSerDes.class.isAssignableFrom(functionSerDesObj.getClass())) {
-            return (FuncSerDes) functionSerDesObj;
-        }
-        return (FuncSerDes) this.getInstance(properties, FUNCTION_SERDES_CLASS);
-    }
-
     private String getProcessName(Properties properties) {
         this.processName = properties.getProperty(PROCESS_NAME);
         if (this.processName == null || this.processName.trim().isBlank()) {
@@ -126,33 +106,14 @@ public class FuncWorkflow<T> {
         return this.processName;
     }
 
-    private <G> G getInstance(Properties properties, String key) {
-        String clazz = properties.getProperty(key);
-        if (clazz == null || clazz.isBlank()) {
-            throw new IllegalStateException("Please provide following property='" + key + "'.");
+    public void start() {
+        if (funcStream != null) {
+            return;
         }
-        try {
-            Class<?> dataSerdesClass = Class.forName(clazz);
-            return (G) dataSerdesClass.getDeclaredConstructor(new Class[0]).newInstance(new Object[0]);
-        } catch (ClassNotFoundException | IllegalAccessException | IllegalArgumentException | InstantiationException
-                | NoSuchMethodException | SecurityException | InvocationTargetException e) {
-            throw new IllegalStateException("Could not create " + key, e);
-        }
-    }
-
-    private <G> G getInstanceOptional(Properties properties, String key) {
-        String clazz = properties.getProperty(key);
-        if (clazz == null || clazz.isBlank()) {
-            return null;
-        }
-        return this.getInstance(properties, key);
-    }
-
-    private void startEngine() {
-        String bootstrapServer = this.serviceConfig.getProducerProperties().getProperty(KAFKA_BOOTSTRAP_SERVERS);
+        String bootstrapServer = this.getProducerProperties().getProperty(KAFKA_BOOTSTRAP_SERVERS);
         LOG.info("Checking if Kafka is ready. For bootstrapserver={}", bootstrapServer);
         for (int i = 0; i < 150; ++i) {
-            if (this.isKafkaReady(this.serviceConfig.getProducerProperties())) {
+            if (this.isKafkaReady(this.getProducerProperties())) {
                 LOG.info("Kafka is ready. Continue ...");
                 break;
             }
@@ -165,15 +126,26 @@ public class FuncWorkflow<T> {
             }
         }
         LOG.debug("Start workflow={}", this.getProcessName());
-        this.kafkaProducer = new KafkaProducer<String, FuncEvent>(this.serviceConfig.getProducerProperties());
+        this.kafkaProducer = new KafkaProducer<String, FuncEvent>(this.getProducerProperties());
         HashSet<String> allProcessTopics = new HashSet<>();
         allProcessTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.WORKFLOW));
         LOG.info("Observed workflow topics: {}", allProcessTopics);
         Set<String> missingTopics = this.getMissingTopics(allProcessTopics);
         LOG.info("Missing topics: {}", missingTopics);
         this.createTopics(missingTopics);
-        this.allWorkflowStreams = this.startStreaming(allProcessTopics);
-        this.correlationStream.startStreaming();
+
+        funcStream = new FuncStream<T>(this, this.processEventExecuter);
+        funcStream.start(allProcessTopics);
+
+        if (startCorrelation) {
+            if (this.correlationMerger == null) {
+                this.correlationMerger = new DefaultCorrelationMerger<T>();
+            }
+            if (this.correlationStream == null) {
+                this.correlationStream = new CorrelationStream<T>(this);
+            }
+            this.correlationStream.startStreaming();
+        }
     }
 
     private boolean isKafkaReady(Properties aProperties) {
@@ -198,16 +170,12 @@ public class FuncWorkflow<T> {
 
     public void close() {
         LOG.info("Caught shutdown hook!");
-        this.allWorkflowStreams.parallelStream().forEach(FuncStream::close);
+        this.funcStream.close();
         this.kafkaProducer.close();
-        this.correlationStream.close();
+        if (this.correlationStream != null) {
+            this.correlationStream.close();
+        }
         LOG.info("Application exited.");
-    }
-
-    private List<FuncStream<T>> startStreaming(Collection<String> allProcessTopics) {
-        FuncStream<T> workflowStream = new FuncStream<T>(this, this.processEventExecuter);
-        workflowStream.start(allProcessTopics);
-        return Arrays.asList(workflowStream);
     }
 
     private Set<String> getMissingTopics(Collection<String> aAllTopics) {
@@ -217,7 +185,7 @@ public class FuncWorkflow<T> {
         requiredTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.CALLBACK));
         requiredTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT));
         requiredTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.RETRY));
-        Properties properties = this.serviceConfig.getAdminClientProperties();
+        Properties properties = this.getAdminClientProperties();
         AdminClient adminClient = AdminClient.create(properties);
         if (adminClient == null) {
             return topicsToCreate;
@@ -269,7 +237,7 @@ public class FuncWorkflow<T> {
             }
             return newTopic;
         }).collect(Collectors.toList());
-        Properties properties = this.serviceConfig.getAdminClientProperties();
+        Properties properties = this.getAdminClientProperties();
         try (AdminClient adminClient = AdminClient.create(properties);) {
             if (!topicsToCreate.isEmpty()) {
                 CreateTopicsResult createTopics = adminClient.createTopics(topicsToCreate);
@@ -310,11 +278,7 @@ public class FuncWorkflow<T> {
         this.kafkaProducer.flush();
     }
 
-    public Properties getConsumerProperties(String groupId) {
-        return this.serviceConfig.getConsumerProperties(groupId);
-    }
-
-    public void sendEvent(FuncEvent functionEvent) {
+    public void sendEvent(FuncEvent<T> functionEvent) {
         String destinationTopic = this.topicResolver.resolveTopicName(functionEvent.getType());
         this.sendEvent(destinationTopic, null, functionEvent);
     }
@@ -333,16 +297,16 @@ public class FuncWorkflow<T> {
         return processEventSerde;
     }
 
-    public FuncEvent startProcess(WorkflowStart<T> processInstance)
+    public FuncEvent<T> startProcess(WorkflowStart<T> processInstance)
             throws InterruptedException, ExecutionException {
         if (processInstance.getFunction() == null) {
             throw new IllegalStateException(
                     "Missing function. Please provide which function should be called at start.");
         }
         UUID processInstanceID = UUID.randomUUID();
-        FuncEvent newFunctionEvent = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> newFunctionEvent = FuncEvent.createWithDefaultValues();
         newFunctionEvent.setType(FuncEvent.Type.WORKFLOW);
-        newFunctionEvent.setFunction(this.functionSerDes.serialize(processInstance.getFunction()));
+        newFunctionEvent.setFunction(this.funcSerDes.serialize(processInstance.getFunction()));
         newFunctionEvent.setProcessInstanceID(processInstanceID.toString());
         newFunctionEvent.setContext(processInstance.getContext());
         newFunctionEvent.setProcessName(this.getProcessName());
@@ -356,7 +320,7 @@ public class FuncWorkflow<T> {
                 if (executionResult.getContext() instanceof Throwable) {
                     throw new RuntimeException((Throwable) executionResult.getContext());
                 }
-                throw new RuntimeException(this.dataSerDes.serialize(executionResult.getContext()));
+                throw new RuntimeException(this.funcContextSerDes.serialize(executionResult.getContext()));
             }
             if (executionResult.getType() == Type.TRANSIENT || executionResult.getType() == Type.END) {
                 return executionResult;
@@ -369,9 +333,9 @@ public class FuncWorkflow<T> {
         return newFunctionEvent;
     }
 
-    public FuncEvent correlate(ProcessCorrelation<T> correlation)
+    public FuncEvent<T> correlate(ProcessCorrelation<T> correlation)
             throws InterruptedException, ExecutionException {
-        FuncEvent callbackMessage = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> callbackMessage = FuncEvent.createWithDefaultValues();
         callbackMessage.setCorrelationState(CorrelationState.CALLBACK_RECEIVED);
         callbackMessage.setCorrelationId(correlation.getCorrelationId());
         callbackMessage.setContext(correlation.getData());
@@ -395,23 +359,16 @@ public class FuncWorkflow<T> {
         return property;
     }
 
-    public FuncWorkflowConfig<T> getServiceConfig() {
-        return this.serviceConfig;
-    }
-
-    public FuncContextSerDes<T> getDataSerDes() {
-        return this.dataSerDes;
+    public FuncContextSerDes<T> getFuncContextSerDes() {
+        return this.funcContextSerDes;
     }
 
     public CorrelationMerger<T> getCorrelationMerger() {
-        if (correlationMerger == null) {
-            this.correlationMerger = new DefaultCorrelationMerger<T>();
-        }
         return this.correlationMerger;
     }
 
-    public FuncSerDes getFunctionSerDes() {
-        return this.functionSerDes;
+    public void setCorrelationMerger(CorrelationMerger<T> correlationMerger) {
+        this.correlationMerger = correlationMerger;
     }
 
     public String getFunction(FuncEvent event) {
@@ -422,7 +379,7 @@ public class FuncWorkflow<T> {
             return event.getFunction();
         }
         if (event.getFunctionObj() != null) {
-            String serializedFunction = this.functionSerDes.serialize(event.getFunctionObj());
+            String serializedFunction = this.funcSerDes.serialize(event.getFunctionObj());
             event.setFunction(serializedFunction);
         } else {
             LOG.error("Step has not been defined.");
@@ -430,11 +387,42 @@ public class FuncWorkflow<T> {
         return event.getFunction();
     }
 
-    public FuncEventUtil getProcessEventUtil() {
-        return this.processEventUtil;
+    public void setFuncContextSerDes(FuncContextSerDes<T> funcContextSerDes) {
+        this.funcContextSerDes = funcContextSerDes;
     }
 
-    public void setProcessEventUtil(FuncEventUtil processEventUtil) {
-        this.processEventUtil = processEventUtil;
+    public FuncSerDes getFuncSerDes() {
+        return funcSerDes;
+    }
+
+    public void setFuncSerDes(FuncSerDes funcSerDes) {
+        this.funcSerDes = funcSerDes;
+    }
+
+    private Properties getProducerProperties() {
+        Properties producerProperties = new Properties();
+        producerProperties.setProperty("bootstrap.servers", getProperty("bootstrap.servers"));
+        producerProperties.setProperty("key.serializer", StringSerializer.class.getName());
+        producerProperties.setProperty("enable.idempotence", "true");
+        producerProperties.setProperty("acks", "all");
+        producerProperties.setProperty("retries", "10");
+        producerProperties.setProperty("max.in.flight.requests.per.connection", "5");
+        producerProperties.setProperty("compression.type", "snappy");
+        producerProperties.setProperty("max.block.ms", "60000");
+        producerProperties.setProperty("linger.ms", "20");
+        producerProperties.setProperty("batch.size", Integer.toString(32768));
+        producerProperties.put("value.serializer", FuncEventSerializer.class.getName());
+        return producerProperties;
+    }
+
+    private Properties getAdminClientProperties() {
+        Properties clientProperties = this.getProperties();
+        Properties properties = new Properties();
+        properties.setProperty("bootstrap.servers", clientProperties.getProperty("bootstrap.servers"));
+        return properties;
+    }
+
+    public void setStartCorrelation(boolean startCorrelation) {
+        this.startCorrelation = startCorrelation;
     }
 }

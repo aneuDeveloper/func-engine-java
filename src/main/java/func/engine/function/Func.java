@@ -19,7 +19,7 @@ public interface Func<T> extends IFunc {
     public FuncEvent<T> work(FuncEvent<T> functionEvent);
 
     default FuncEvent<T> nextFunction(FuncEvent<T> functionEvent, IFunc nextFunction) {
-        FuncEvent<T> nextFunctionEvent = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> nextFunctionEvent = FuncEvent.createWithDefaultValues();
         nextFunctionEvent.setProcessName(functionEvent.getProcessName());
         nextFunctionEvent.setComingFromId(functionEvent.getId());
         nextFunctionEvent.setProcessInstanceID(functionEvent.getProcessInstanceID());
@@ -30,7 +30,7 @@ public interface Func<T> extends IFunc {
     }
 
     default FuncEvent<T> nextFunctionTransient(FuncEvent<T> functionEvent, IFunc function) {
-        FuncEvent<T> nextFunction = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
         nextFunction.setProcessName(functionEvent.getProcessName());
         nextFunction.setComingFromId(functionEvent.getId());
         nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
@@ -46,7 +46,7 @@ public interface Func<T> extends IFunc {
         if (nextRetryAt == null) {
             return null;
         }
-        FuncEvent<T> retry = FuncEventUtil.createWithDefaultValues();
+        FuncEvent<T> retry = FuncEvent.createWithDefaultValues();
         retry.setProcessName(functionEvent.getProcessName());
         retry.setComingFromId(functionEvent.getId());
         retry.setType(FuncEvent.Type.RETRY);
