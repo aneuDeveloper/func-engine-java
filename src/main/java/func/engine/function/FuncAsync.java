@@ -10,26 +10,8 @@
 */
 package func.engine.function;
 
-import func.engine.correlation.CorrelationState;
-
-public interface FuncAsync<T> extends Func<T> {
-    public FuncEvent<T> start(FuncEvent<T> functionEvent);
+public interface FuncAsync<T> extends IFunc {
+    public FuncEvent<T> createCorrelation(FuncEvent<T> functionEvent);
 
     public FuncEvent<T> continueFunction(FuncEvent<T> functionEvent);
-
-    default FuncEvent<T> createCorrelation(FuncEvent<T> functionEvent, String correlationId) {
-        if (correlationId == null) {
-            throw new IllegalStateException("CorrelationId must be specified.");
-        }
-        FuncEvent<T> correlation = FuncEvent.createWithDefaultValues();
-        correlation.setProcessName(functionEvent.getProcessName());
-        correlation.setProcessInstanceID(functionEvent.getProcessInstanceID());
-        correlation.setType(FuncEvent.Type.CORRELATION);
-        correlation.setCorrelationState(CorrelationState.INITIALIZED);
-        correlation.setCorrelationId(correlationId);
-        correlation.setFunction(functionEvent.getFunction());
-        correlation.setComingFromId(functionEvent.getId());
-        correlation.setContext(functionEvent.getContext());
-        return correlation;
-    }
 }

@@ -25,15 +25,15 @@ import org.apache.kafka.streams.processor.RecordContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import func.engine.FuncWorkflow;
+import func.engine.FuncEngine;
 import func.engine.function.FuncEvent;
 
 public class CorrelationStream<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(CorrelationStream.class);
-    private FuncWorkflow<T> processDefinition;
+    private FuncEngine<T> processDefinition;
     private KafkaStreams stream;
 
-    public CorrelationStream(FuncWorkflow<T> processDefinition) {
+    public CorrelationStream(FuncEngine<T> processDefinition) {
         this.processDefinition = processDefinition;
     }
 

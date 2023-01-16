@@ -11,7 +11,6 @@
 package func.engine;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,8 +47,8 @@ import func.engine.function.FuncEventDeserializer;
 import func.engine.function.FuncEventSerializer;
 import func.engine.function.FuncSerDes;
 
-public class FuncWorkflow<T> {
-    private static final Logger LOG = LoggerFactory.getLogger(FuncWorkflow.class);
+public class FuncEngine<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(FuncEngine.class);
     public static final String PROCESS_NAME = "process.name";
     public static final String KAFKA_BOOTSTRAP_SERVERS = "bootstrap.servers";
     public static final String SYNCHRONOUS_WAITHANDLER_STEAM_APPLICATION_NAME = "synchronous.waithandler.stream.application.name";
@@ -62,7 +61,6 @@ public class FuncWorkflow<T> {
     public static final String STEPS_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
     public static final String CORRELATION_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
     public static final String DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG = "default.deserialization.exception.handler";
-    public static final String TOPIC_RESOLVER_OBJ = "topic.resolver.obj";
 
     private KafkaProducer<String, FuncEvent> kafkaProducer;
     private String processName;
@@ -76,26 +74,13 @@ public class FuncWorkflow<T> {
     private FuncExecuter<T> processEventExecuter;
     private boolean startCorrelation = true;
 
-    public FuncWorkflow(Properties properties) {
+    public FuncEngine(Properties properties) {
         if (properties == null) {
             throw new IllegalStateException("Please provide properties");
         }
         this.properties = properties;
         this.processName = this.getProcessName(properties);
-        this.topicResolver = this.createTopicResolver(properties);
         this.processEventExecuter = new FuncExecuter<T>(this);
-    }
-
-    private TopicResolver createTopicResolver(Properties properties) {
-        Object topicResolver = properties.get(TOPIC_RESOLVER_OBJ);
-        if (topicResolver != null && TopicResolver.class.isAssignableFrom(topicResolver.getClass())) {
-            return (TopicResolver) topicResolver;
-        }
-        return new DefaultTopicResolver(this.processName + "-");
-    }
-
-    public TopicResolver getTopicResolver() {
-        return this.topicResolver;
     }
 
     private String getProcessName(Properties properties) {
@@ -128,7 +113,7 @@ public class FuncWorkflow<T> {
         LOG.debug("Start workflow={}", this.getProcessName());
         this.kafkaProducer = new KafkaProducer<String, FuncEvent>(this.getProducerProperties());
         HashSet<String> allProcessTopics = new HashSet<>();
-        allProcessTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.WORKFLOW));
+        allProcessTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
         LOG.info("Observed workflow topics: {}", allProcessTopics);
         Set<String> missingTopics = this.getMissingTopics(allProcessTopics);
         LOG.info("Missing topics: {}", missingTopics);
@@ -181,10 +166,12 @@ public class FuncWorkflow<T> {
     private Set<String> getMissingTopics(Collection<String> aAllTopics) {
         Set<String> topicsToCreate = new HashSet<>();
         ArrayList<String> requiredTopics = new ArrayList<>(aAllTopics);
-        requiredTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.CORRELATION));
-        requiredTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.CALLBACK));
-        requiredTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT));
-        requiredTopics.add(this.topicResolver.resolveTopicName(FuncEvent.Type.RETRY));
+        if (this.startCorrelation && this.correlationMerger != null) {
+            requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CORRELATION));
+            requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK));
+        }
+        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT));
+        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.RETRY));
         Properties properties = this.getAdminClientProperties();
         AdminClient adminClient = AdminClient.create(properties);
         if (adminClient == null) {
@@ -224,7 +211,7 @@ public class FuncWorkflow<T> {
             LOG.info("Creating topic {} with partitions={} and replicationFactor={}",
                     new Object[] { newTopicName, numPartitions, replicationFactor });
             NewTopic newTopic = new NewTopic(newTopicName, numPartitions, replicationFactor);
-            if (this.topicResolver.resolveTopicName(FuncEvent.Type.CORRELATION).equals(newTopicName)) {
+            if (getTopicResolver().resolveTopicName(FuncEvent.Type.CORRELATION).equals(newTopicName)) {
                 Map<String, String> configs = new HashMap<>();
                 configs.put("cleanup.policy", "compact");
                 long defaultDuration = 3456000000L;
@@ -279,7 +266,7 @@ public class FuncWorkflow<T> {
     }
 
     public void sendEvent(FuncEvent<T> functionEvent) {
-        String destinationTopic = this.topicResolver.resolveTopicName(functionEvent.getType());
+        String destinationTopic = getTopicResolver().resolveTopicName(functionEvent.getType());
         this.sendEvent(destinationTopic, null, functionEvent);
     }
 
@@ -328,7 +315,7 @@ public class FuncWorkflow<T> {
                 newFunctionEvent = executionResult;
             }
         }
-        String destinationTopic = this.topicResolver.resolveTopicName(newFunctionEvent.getType());
+        String destinationTopic = getTopicResolver().resolveTopicName(newFunctionEvent.getType());
         this.sendEventAndWait(destinationTopic, null, newFunctionEvent);
         return newFunctionEvent;
     }
@@ -341,7 +328,7 @@ public class FuncWorkflow<T> {
         callbackMessage.setContext(correlation.getData());
         String topicKeyWithProcessNameAndCorrelationId = this
                 .getProcessNameWithCorrelationId(correlation.getCorrelationId());
-        String callbackTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.CALLBACK);
+        String callbackTopic = getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK);
         this.sendEventAndWait(callbackTopic, topicKeyWithProcessNameAndCorrelationId, callbackMessage);
         return callbackMessage;
     }
@@ -424,5 +411,16 @@ public class FuncWorkflow<T> {
 
     public void setStartCorrelation(boolean startCorrelation) {
         this.startCorrelation = startCorrelation;
+    }
+
+    public TopicResolver getTopicResolver() {
+        if (this.topicResolver == null) {
+            this.topicResolver = new DefaultTopicResolver(this.processName + "-");
+        }
+        return this.topicResolver;
+    }
+
+    public void setTopicResolver(TopicResolver topicResolver) {
+        this.topicResolver = topicResolver;
     }
 }

@@ -11,8 +11,10 @@
 package func.engine.function;
 
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import func.engine.Retries;
 import func.engine.correlation.CorrelationState;
 
 public class FuncEvent<T> {
@@ -55,12 +57,6 @@ public class FuncEvent<T> {
     protected FuncEvent(String version, String id) {
         this.version = version;
         this.id = id;
-    }
-
-    public static final <T> FuncEvent<T> createWithDefaultValues() {
-        FuncEvent<T> functionEvent = new FuncEvent<>("1", UUID.randomUUID().toString());
-        functionEvent.setTimeStamp(ZonedDateTime.now());
-        return functionEvent;
     }
 
     public String getVersion() {
@@ -189,5 +185,88 @@ public class FuncEvent<T> {
 
     public void setError(Throwable error) {
         this.error = error;
+    }
+
+    public static final <T> FuncEvent<T> createWithDefaultValues() {
+        FuncEvent<T> functionEvent = new FuncEvent<>("1", UUID.randomUUID().toString());
+        functionEvent.setTimeStamp(ZonedDateTime.now());
+        return functionEvent;
+    }
+
+    public FuncEvent<T> correlation(String correlationId) {
+        if (correlationId == null) {
+            throw new IllegalStateException("CorrelationId must be specified.");
+        }
+        FuncEvent<T> correlation = FuncEvent.createWithDefaultValues();
+        correlation.setProcessName(getProcessName());
+        correlation.setProcessInstanceID(getProcessInstanceID());
+        correlation.setType(FuncEvent.Type.CORRELATION);
+        correlation.setCorrelationState(CorrelationState.INITIALIZED);
+        correlation.setCorrelationId(correlationId);
+        correlation.setFunction(getFunction());
+        correlation.setComingFromId(getId());
+        correlation.setContext(getContext());
+        return correlation;
+    }
+
+    public FuncEvent<T> next(IFunc nextFunction) {
+        FuncEvent<T> nextFunctionEvent = FuncEvent.createWithDefaultValues();
+        nextFunctionEvent.setProcessName(getProcessName());
+        nextFunctionEvent.setComingFromId(getId());
+        nextFunctionEvent.setProcessInstanceID(getProcessInstanceID());
+        nextFunctionEvent.setType(FuncEvent.Type.WORKFLOW);
+        nextFunctionEvent.setContext(getContext());
+        nextFunctionEvent.setFunctionObj(nextFunction);
+        return nextFunctionEvent;
+    }
+
+    public FuncEvent<T> nextTransient(IFunc function) {
+        FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
+        nextFunction.setProcessName(getProcessName());
+        nextFunction.setComingFromId(getId());
+        nextFunction.setProcessInstanceID(getProcessInstanceID());
+        nextFunction.setType(FuncEvent.Type.TRANSIENT);
+        nextFunction.setFunctionObj(function);
+        nextFunction.setContext(getContext());
+        return nextFunction;
+    }
+
+    public FuncEvent<T> retry(Retries... retriesArray) {
+        int executedRetries = getRetryCount();
+        ZonedDateTime currentTime = ZonedDateTime.now();
+
+        Retries choosenRetryUnitWithNumber = null;
+        if (retriesArray == null) {
+            if (3 <= executedRetries) {
+                // no retries anymore
+                return null;
+            }
+            choosenRetryUnitWithNumber = Retries.build().retryTimes(3).in(5, ChronoUnit.MINUTES);
+        } else {
+            int maxPossibleRetries = 0;
+            for (Retries retries : retriesArray) {
+                if ((maxPossibleRetries += retries.getRetryTimes()) <= executedRetries
+                        || maxPossibleRetries <= executedRetries)
+                    continue;
+                choosenRetryUnitWithNumber = retries;
+                break;
+            }
+        }
+        if (choosenRetryUnitWithNumber == null) {
+            return null;
+        }
+        long jdf = choosenRetryUnitWithNumber.getTime();
+        ZonedDateTime nextRetryAt = currentTime.plus(jdf, choosenRetryUnitWithNumber.getTimeUnit());
+
+        FuncEvent<T> retry = FuncEvent.createWithDefaultValues();
+        retry.setProcessName(getProcessName());
+        retry.setComingFromId(getId());
+        retry.setType(FuncEvent.Type.RETRY);
+        retry.setNextRetryAt(nextRetryAt);
+        retry.setRetryCount(getRetryCount() + 1);
+        retry.setFunction(getFunction());
+        retry.setProcessInstanceID(getProcessInstanceID());
+        retry.setContext(getContext());
+        return retry;
     }
 }

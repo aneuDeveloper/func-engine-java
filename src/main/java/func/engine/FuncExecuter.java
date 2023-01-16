@@ -24,10 +24,10 @@ import func.engine.function.IFunc;
 
 public class FuncExecuter<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncExecuter.class);
-    private FuncWorkflow<T> functionWorkflow;
+    private FuncEngine<T> functionWorkflow;
     private TopicResolver topicResolver;
 
-    public FuncExecuter(FuncWorkflow<T> functionWorkflow) {
+    public FuncExecuter(FuncEngine<T> functionWorkflow) {
         this.functionWorkflow = functionWorkflow;
         this.topicResolver = this.functionWorkflow.getTopicResolver();
     }
@@ -124,7 +124,13 @@ public class FuncExecuter<T> {
     private FuncEvent<T> executeStatefulAsyncFunction(FuncEvent<T> functionEvent, FuncAsync<T> function)
             throws InterruptedException, ExecutionException {
         if (functionEvent.getCorrelationState() == null) {
-            FuncEvent<T> correlationEvent = function.start(functionEvent);
+            throw new IllegalStateException(
+                    String.format(
+                            "Correlation state must be provided for async function for processInstanceId=%s and functionId=%s",
+                            functionEvent.getProcessInstanceID(), functionEvent.getId()));
+        }
+        if (functionEvent.getCorrelationState() == null) {
+            FuncEvent<T> correlationEvent = function.createCorrelation(functionEvent);
             if (correlationEvent == null) {
                 throw new IllegalStateException(
                         String.format("No correlation specified for processInstanceId=%s and functionId=%s",

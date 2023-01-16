@@ -31,11 +31,11 @@ import func.engine.function.FuncEventTransformer;
 
 public class FuncStream<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncStream.class);
-    private FuncWorkflow<T> processDefinition;
+    private FuncEngine<T> processDefinition;
     private KafkaStreams streams;
     private FuncExecuter<T> processEventExecuter;
 
-    public FuncStream(FuncWorkflow<T> processDefinition, FuncExecuter<T> processEventExecuter) {
+    public FuncStream(FuncEngine<T> processDefinition, FuncExecuter<T> processEventExecuter) {
         this.processDefinition = processDefinition;
         this.processEventExecuter = processEventExecuter;
     }
@@ -71,7 +71,7 @@ public class FuncStream<T> {
 
     private Properties prepareProperties(String topicName) {
         Properties properties = this.getWorkflowStreamProperties();
-        String applicationNamePrefix = this.processDefinition.getProperty(FuncWorkflow.WORKFLOW_STREAM_PREFIX,
+        String applicationNamePrefix = this.processDefinition.getProperty(FuncEngine.WORKFLOW_STREAM_PREFIX,
                 this.processDefinition.getProcessName());
         properties.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationNamePrefix + "-" + topicName);
         return properties;
