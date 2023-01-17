@@ -37,6 +37,8 @@ public class FuncExecuter<T> {
             FuncEvent<T> nextFunctionEvent = this.executeMessage(functionEvent);
             return nextFunctionEvent;
         } catch (Throwable e) {
+            LOGGER.error("Error while executing function. ProcessInstanceID=" + functionEvent.getProcessInstanceID()
+                    + " functionId=" + functionEvent.getId(), e);
             FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
             nextFunction.setProcessName(functionEvent.getProcessName());
             nextFunction.setComingFromId(functionEvent.getId());
@@ -74,22 +76,18 @@ public class FuncExecuter<T> {
         return this.executeStatefulFunction(functionEvent, (Func<T>) function);
     }
 
-    private IFunc getFunctionObj(FuncEvent functionEvent) {
+    private IFunc getFunctionObj(FuncEvent<T> functionEvent) {
         if (functionEvent.getFunctionObj() != null) {
             return functionEvent.getFunctionObj();
         }
         if (functionEvent.getFunction() != null) {
             IFunc functionObj = this.functionWorkflow.getFuncSerDes().deserialize(functionEvent);
             functionEvent.setFunctionObj(functionObj);
-            functionEvent.setFunctionObj(functionObj);
-            if (functionEvent.getFunction() == null) {
-                String functionName = this.functionWorkflow.getFuncSerDes().serialize(functionObj);
-                functionEvent.setFunction(functionName);
-            }
-            return functionEvent.getFunctionObj();
         }
         if (functionEvent.getFunctionObj() == null) {
-            LOGGER.error("Function object has not been defined and could not be deserialized for String represention.");
+            throw new IllegalStateException(
+                    "Function could not be determined for function event with Id=" + functionEvent.getId()
+                            + " and ProcessInstanceID=" + functionEvent.getProcessInstanceID());
         }
         return functionEvent.getFunctionObj();
     }
@@ -123,12 +121,6 @@ public class FuncExecuter<T> {
 
     private FuncEvent<T> executeStatefulAsyncFunction(FuncEvent<T> functionEvent, FuncAsync<T> function)
             throws InterruptedException, ExecutionException {
-        if (functionEvent.getCorrelationState() == null) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Correlation state must be provided for async function for processInstanceId=%s and functionId=%s",
-                            functionEvent.getProcessInstanceID(), functionEvent.getId()));
-        }
         if (functionEvent.getCorrelationState() == null) {
             FuncEvent<T> correlationEvent = function.createCorrelation(functionEvent);
             if (correlationEvent == null) {

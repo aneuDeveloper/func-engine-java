@@ -54,6 +54,10 @@ public class FuncEvent<T> {
     private volatile T context;
     private volatile Throwable error;
 
+    protected FuncEvent(String version) {
+        this.version = version;
+    }
+
     protected FuncEvent(String version, String id) {
         this.version = version;
         this.id = id;
@@ -188,7 +192,7 @@ public class FuncEvent<T> {
     }
 
     public static final <T> FuncEvent<T> createWithDefaultValues() {
-        FuncEvent<T> functionEvent = new FuncEvent<>("1", UUID.randomUUID().toString());
+        FuncEvent<T> functionEvent = new FuncEvent<>(FuncEventDeserializer.VERSION, UUID.randomUUID().toString());
         functionEvent.setTimeStamp(ZonedDateTime.now());
         return functionEvent;
     }

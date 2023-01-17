@@ -10,6 +10,8 @@
 */
 package func.engine.function;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.text.SimpleDateFormat;
 import java.time.format.DateTimeFormatter;
 
@@ -17,12 +19,20 @@ import org.apache.kafka.common.serialization.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import func.engine.function.FuncEvent.Type;
+
 public class FuncEventSerializer<T> implements Serializer<FuncEvent<T>> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncEventSerializer.class);
     public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     public static final String PAYLOAD_SEPARATOR = "$e%,";
 
     private FuncContextSerDes<T> serDes;
+    private FuncSerDes funcSerDes;
+
+    public FuncEventSerializer(FuncContextSerDes<T> serDes, FuncSerDes funcSerDes) {
+        this.serDes = serDes;
+        this.funcSerDes = funcSerDes;
+    }
 
     public byte[] serialize(String topic, FuncEvent<T> functionEvent) {
         StringBuilder builder = new StringBuilder();
@@ -45,7 +55,10 @@ public class FuncEventSerializer<T> implements Serializer<FuncEvent<T>> {
         }
         if (functionEvent.getFunction() != null) {
             builder.append(",func=").append(functionEvent.getFunction());
+        } else if (functionEvent.getFunctionObj() != null) {
+            builder.append(",func=").append(funcSerDes.serialize(functionEvent.getFunctionObj()));
         }
+
         if (functionEvent.getNextRetryAt() != null) {
             builder.append(",nextRetryAt=")
                     .append(DateTimeFormatter.ISO_INSTANT.format(functionEvent.getNextRetryAt()));
@@ -58,16 +71,17 @@ public class FuncEventSerializer<T> implements Serializer<FuncEvent<T>> {
         }
 
         builder.append(",$e%,");
-        if (functionEvent.getContext() != null) {
-            builder.append(this.serDes.serialize(functionEvent.getContext()));
-        } else if (functionEvent.getError() != null) {
+        if (functionEvent.getType() != null && functionEvent.getType() == Type.ERROR
+                && functionEvent.getError() != null) {
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            functionEvent.getError().printStackTrace(pw);
+            builder.append(sw.toString());
+        } else if (functionEvent.getContext() != null) {
             builder.append(this.serDes.serialize(functionEvent.getContext()));
         }
+
         LOGGER.trace("ProcessEvent is serialized to: {}", builder.toString());
         return builder.toString().getBytes();
-    }
-
-    public void setSerDes(FuncContextSerDes<T> serDes) {
-        this.serDes = serDes;
     }
 }

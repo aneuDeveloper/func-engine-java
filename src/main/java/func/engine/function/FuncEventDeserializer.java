@@ -21,10 +21,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import func.engine.correlation.CorrelationState;
+import func.engine.function.FuncEvent.Type;
 
 public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncEventDeserializer.class);
+    public static final String VERSION = "1";
     private FuncContextSerDes<T> serDes;
+
+    public FuncEventDeserializer(FuncContextSerDes<T> serDes) {
+        this.serDes = serDes;
+    }
 
     public FuncEvent<T> deserialize(String topic, byte[] data) {
         String dataAsString = new String(data);
@@ -34,16 +40,19 @@ public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
 
     public FuncEvent<T> deserialize(String messageAsString) {
         int indexOfEnd = messageAsString.indexOf("$e%,");
-        String metadata = this.getMetaData(messageAsString, indexOfEnd);
-        String clientData = messageAsString.substring(indexOfEnd + 4, messageAsString.length());
-        FuncEvent<T> functionEvent = FuncEvent.createWithDefaultValues();
-        functionEvent.setContext(serDes.deserialize(clientData));
-        this.populateVariables(functionEvent, metadata);
-        return functionEvent;
-    }
+        String metadata = messageAsString.substring(0, indexOfEnd);
 
-    private String getMetaData(String data, int indexOfEnd) {
-        return data.substring(0, indexOfEnd);
+        FuncEvent<T> functionEvent = new FuncEvent<>(VERSION);
+        this.populateVariables(functionEvent, metadata);
+
+        String clientData = messageAsString.substring(indexOfEnd + 4, messageAsString.length());
+        if (functionEvent.getType() != null && functionEvent.getType() == Type.ERROR) {
+            Exception exception = new Exception(clientData);
+            functionEvent.setError(exception);
+            return functionEvent;
+        }
+        functionEvent.setContext(serDes.deserialize(clientData));
+        return functionEvent;
     }
 
     private void populateVariables(FuncEvent<T> functionEvent, String metadata) {
@@ -137,9 +146,5 @@ public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
             LOGGER.error(e.getMessage(), e);
             return null;
         }
-    }
-
-    public void setSerDes(FuncContextSerDes<T> serDes) {
-        this.serDes = serDes;
     }
 }

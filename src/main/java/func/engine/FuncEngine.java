@@ -22,11 +22,13 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -62,7 +64,7 @@ public class FuncEngine<T> {
     public static final String CORRELATION_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
     public static final String DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG = "default.deserialization.exception.handler";
 
-    private KafkaProducer<String, FuncEvent> kafkaProducer;
+    private KafkaProducer<String, String> kafkaProducer;
     private String processName;
     private CorrelationStream<T> correlationStream;
     private FuncStream<T> funcStream;
@@ -73,6 +75,7 @@ public class FuncEngine<T> {
     private TopicResolver topicResolver;
     private FuncExecuter<T> processEventExecuter;
     private boolean startCorrelation = true;
+    private FuncEventSerializer<T> funcEventSerializer;
 
     public FuncEngine(Properties properties) {
         if (properties == null) {
@@ -111,7 +114,9 @@ public class FuncEngine<T> {
             }
         }
         LOG.debug("Start workflow={}", this.getProcessName());
-        this.kafkaProducer = new KafkaProducer<String, FuncEvent>(this.getProducerProperties());
+
+        this.kafkaProducer = new KafkaProducer<>(this.getProducerProperties());
+
         HashSet<String> allProcessTopics = new HashSet<>();
         allProcessTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
         LOG.info("Observed workflow topics: {}", allProcessTopics);
@@ -166,7 +171,7 @@ public class FuncEngine<T> {
     private Set<String> getMissingTopics(Collection<String> aAllTopics) {
         Set<String> topicsToCreate = new HashSet<>();
         ArrayList<String> requiredTopics = new ArrayList<>(aAllTopics);
-        if (this.startCorrelation && this.correlationMerger != null) {
+        if (this.startCorrelation) {
             requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CORRELATION));
             requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK));
         }
@@ -247,8 +252,10 @@ public class FuncEngine<T> {
         return this.getProperty(key, defaultValue);
     }
 
-    public void sendEvent(String destinationTopic, String key, FuncEvent functionEvent) {
-        ProducerRecord<String, FuncEvent> record = new ProducerRecord<>(destinationTopic, key, functionEvent);
+    public void sendEvent(String destinationTopic, String key, FuncEvent<T> functionEvent) {
+        FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
+        byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
+        ProducerRecord<String, String> record = new ProducerRecord<>(destinationTopic, key, new String(serialize));
         this.kafkaProducer.send(record);
         this.kafkaProducer.flush();
     }
@@ -260,7 +267,9 @@ public class FuncEngine<T> {
 
     public void sendEventAndWait(String destinationTopic, String key, FuncEvent functionEvent)
             throws InterruptedException, ExecutionException {
-        ProducerRecord<String, FuncEvent> record = new ProducerRecord<>(destinationTopic, key, functionEvent);
+        FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
+        byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
+        ProducerRecord<String, String> record = new ProducerRecord<>(destinationTopic, key, new String(serialize));
         this.kafkaProducer.send(record).get();
         this.kafkaProducer.flush();
     }
@@ -278,9 +287,16 @@ public class FuncEngine<T> {
         return this.getProcessName() + "_" + correlation;
     }
 
+    public FuncEventSerializer<T> getFuncEventSerializer() {
+        if (this.funcEventSerializer == null) {
+            this.funcEventSerializer = new FuncEventSerializer<>(this.getFuncContextSerDes(), this.funcSerDes);
+        }
+        return funcEventSerializer;
+    }
+
     public Serde<FuncEvent<T>> getSerde() {
-        Serde<FuncEvent<T>> processEventSerde = Serdes.serdeFrom(new FuncEventSerializer(),
-                new FuncEventDeserializer());
+        FuncEventDeserializer<T> funcEventDeserializer = new FuncEventDeserializer<>(this.getFuncContextSerDes());
+        Serde<FuncEvent<T>> processEventSerde = Serdes.serdeFrom(getFuncEventSerializer(), funcEventDeserializer);
         return processEventSerde;
     }
 
@@ -350,6 +366,10 @@ public class FuncEngine<T> {
         return this.funcContextSerDes;
     }
 
+    public void setFuncContextSerDes(FuncContextSerDes<T> funcContextSerDes) {
+        this.funcContextSerDes = funcContextSerDes;
+    }
+
     public CorrelationMerger<T> getCorrelationMerger() {
         return this.correlationMerger;
     }
@@ -358,7 +378,7 @@ public class FuncEngine<T> {
         this.correlationMerger = correlationMerger;
     }
 
-    public String getFunction(FuncEvent event) {
+    public String getFunction(FuncEvent<T> event) {
         if (event == null) {
             return null;
         }
@@ -374,10 +394,6 @@ public class FuncEngine<T> {
         return event.getFunction();
     }
 
-    public void setFuncContextSerDes(FuncContextSerDes<T> funcContextSerDes) {
-        this.funcContextSerDes = funcContextSerDes;
-    }
-
     public FuncSerDes getFuncSerDes() {
         return funcSerDes;
     }
@@ -388,24 +404,25 @@ public class FuncEngine<T> {
 
     private Properties getProducerProperties() {
         Properties producerProperties = new Properties();
-        producerProperties.setProperty("bootstrap.servers", getProperty("bootstrap.servers"));
-        producerProperties.setProperty("key.serializer", StringSerializer.class.getName());
-        producerProperties.setProperty("enable.idempotence", "true");
-        producerProperties.setProperty("acks", "all");
-        producerProperties.setProperty("retries", "10");
-        producerProperties.setProperty("max.in.flight.requests.per.connection", "5");
-        producerProperties.setProperty("compression.type", "snappy");
-        producerProperties.setProperty("max.block.ms", "60000");
-        producerProperties.setProperty("linger.ms", "20");
-        producerProperties.setProperty("batch.size", Integer.toString(32768));
-        producerProperties.put("value.serializer", FuncEventSerializer.class.getName());
+        producerProperties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getProperty("bootstrap.servers"));
+        producerProperties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        producerProperties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        producerProperties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+        producerProperties.setProperty(ProducerConfig.RETRIES_CONFIG, "10");
+        producerProperties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
+        producerProperties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+        producerProperties.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
+        producerProperties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
+        producerProperties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32768));
+        producerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         return producerProperties;
     }
 
     private Properties getAdminClientProperties() {
         Properties clientProperties = this.getProperties();
         Properties properties = new Properties();
-        properties.setProperty("bootstrap.servers", clientProperties.getProperty("bootstrap.servers"));
+        properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG,
+                clientProperties.getProperty("bootstrap.servers"));
         return properties;
     }
 
