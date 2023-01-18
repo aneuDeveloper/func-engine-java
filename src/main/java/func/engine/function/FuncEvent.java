@@ -19,7 +19,8 @@ import func.engine.correlation.CorrelationState;
 
 public class FuncEvent<T> {
     public static enum Type {
-        END, CORRELATION, CALLBACK, DEAD_LETTER, RETRY, WORKFLOW, TRANSIENT, ERROR;
+        END, CORRELATION, CALLBACK, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR;
+        // END, CORRELATION, CALLBACK, DEAD_LETTER, RETRY, WORKFLOW, TRANSIENT, ERROR;
     }
 
     public static final String VERSION = "v";
@@ -265,7 +266,7 @@ public class FuncEvent<T> {
         FuncEvent<T> retry = FuncEvent.createWithDefaultValues();
         retry.setProcessName(getProcessName());
         retry.setComingFromId(getId());
-        retry.setType(FuncEvent.Type.RETRY);
+        retry.setType(FuncEvent.Type.WORKFLOW);
         retry.setNextRetryAt(nextRetryAt);
         retry.setRetryCount(getRetryCount() + 1);
         retry.setFunction(getFunction());

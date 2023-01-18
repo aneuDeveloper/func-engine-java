@@ -13,6 +13,7 @@ package func.engine;
 import func.engine.function.FuncEvent;
 
 public interface TopicResolver {
-    public String resolveTopicName(FuncEvent.Type eventType);
+    String resolveTopicName(FuncEvent.Type eventType);
+    String getRetryTopic();
 }
 

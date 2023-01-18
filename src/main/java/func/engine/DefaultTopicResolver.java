@@ -26,9 +26,9 @@ public class DefaultTopicResolver implements TopicResolver {
         }
         switch (functionType) {
             case TRANSIENT:
-            case RETRY: {
-                return functionType.name();
-            }
+            // case RETRY: {
+            //     return functionType.name();
+            // }
             case CALLBACK:
             case CORRELATION: {
                 return this.prefix + functionType.name();
@@ -37,5 +37,10 @@ public class DefaultTopicResolver implements TopicResolver {
                 return this.prefix + FuncEvent.Type.WORKFLOW.name();
         }
 
+    }
+
+    @Override
+    public String getRetryTopic() {
+        return "RETRY";
     }
 }

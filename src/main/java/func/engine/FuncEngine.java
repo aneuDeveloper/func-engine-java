@@ -30,6 +30,7 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -64,7 +65,7 @@ public class FuncEngine<T> {
     public static final String CORRELATION_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
     public static final String DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG = "default.deserialization.exception.handler";
 
-    private KafkaProducer<String, String> kafkaProducer;
+    private KafkaProducer<String, byte[]> kafkaProducer;
     private String processName;
     private CorrelationStream<T> correlationStream;
     private FuncStream<T> funcStream;
@@ -98,10 +99,23 @@ public class FuncEngine<T> {
         if (funcStream != null) {
             return;
         }
-        String bootstrapServer = this.getProducerProperties().getProperty(KAFKA_BOOTSTRAP_SERVERS);
+        Properties producerProperties = new Properties();
+        producerProperties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getProperty("bootstrap.servers"));
+        producerProperties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        producerProperties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+        producerProperties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+        producerProperties.setProperty(ProducerConfig.RETRIES_CONFIG, "10");
+        producerProperties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
+        producerProperties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+        producerProperties.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
+        producerProperties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
+        producerProperties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32768));
+        producerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+
+        String bootstrapServer = producerProperties.getProperty(KAFKA_BOOTSTRAP_SERVERS);
         LOG.info("Checking if Kafka is ready. For bootstrapserver={}", bootstrapServer);
         for (int i = 0; i < 150; ++i) {
-            if (this.isKafkaReady(this.getProducerProperties())) {
+            if (this.isKafkaReady(producerProperties)) {
                 LOG.info("Kafka is ready. Continue ...");
                 break;
             }
@@ -115,7 +129,7 @@ public class FuncEngine<T> {
         }
         LOG.debug("Start workflow={}", this.getProcessName());
 
-        this.kafkaProducer = new KafkaProducer<>(this.getProducerProperties());
+        this.kafkaProducer = new KafkaProducer<>(producerProperties);
 
         HashSet<String> allProcessTopics = new HashSet<>();
         allProcessTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
@@ -176,7 +190,7 @@ public class FuncEngine<T> {
             requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK));
         }
         requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT));
-        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.RETRY));
+        requiredTopics.add(getTopicResolver().getRetryTopic());
         Properties properties = this.getAdminClientProperties();
         AdminClient adminClient = AdminClient.create(properties);
         if (adminClient == null) {
@@ -255,22 +269,28 @@ public class FuncEngine<T> {
     public void sendEvent(String destinationTopic, String key, FuncEvent<T> functionEvent) {
         FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
         byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
-        ProducerRecord<String, String> record = new ProducerRecord<>(destinationTopic, key, new String(serialize));
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
         this.kafkaProducer.send(record);
         this.kafkaProducer.flush();
     }
 
-    public void sendEventSync(String destinationTopic, String key, FuncEvent functionEvent)
+    public void sendEventSync(String destinationTopic, String key, FuncEvent<T> functionEvent)
             throws InterruptedException, ExecutionException {
         this.sendEventSync(destinationTopic, key, functionEvent);
     }
 
-    public void sendEventAndWait(String destinationTopic, String key, FuncEvent functionEvent)
+    public void sendEventAndWait(String destinationTopic, String key, FuncEvent<T> functionEvent)
             throws InterruptedException, ExecutionException {
         FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
         byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
-        ProducerRecord<String, String> record = new ProducerRecord<>(destinationTopic, key, new String(serialize));
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
         this.kafkaProducer.send(record).get();
+        this.kafkaProducer.flush();
+    }
+
+    public void sendEvent(String destinationTopic, byte[] message) {
+        ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, message);
+        this.kafkaProducer.send(record);
         this.kafkaProducer.flush();
     }
 
@@ -300,8 +320,7 @@ public class FuncEngine<T> {
         return processEventSerde;
     }
 
-    public FuncEvent<T> startProcess(WorkflowStart<T> processInstance)
-            throws InterruptedException, ExecutionException {
+    public FuncEvent<T> startProcess(WorkflowStart<T> processInstance) throws Throwable {
         if (processInstance.getFunction() == null) {
             throw new IllegalStateException(
                     "Missing function. Please provide which function should be called at start.");
@@ -315,21 +334,30 @@ public class FuncEngine<T> {
         newFunctionEvent.setProcessName(this.getProcessName());
         if (processInstance.isTransientFunction()) {
             if (!(processInstance.getFunction() instanceof Func)) {
-                throw new IllegalStateException("A transient function should be of type StatefulFunction");
+                throw new IllegalStateException("A transient function should be of type " + Func.class.getName());
             }
             newFunctionEvent.setType(FuncEvent.Type.TRANSIENT);
-            FuncEvent<T> executionResult = this.processEventExecuter.executeMessage(newFunctionEvent);
+            FuncEvent<T> executionResult = this.processEventExecuter.executeTransientFunction(newFunctionEvent,
+                    (Func<T>) processInstance.getFunction());
+
             if (executionResult.getType() == FuncEvent.Type.ERROR) {
-                if (executionResult.getContext() instanceof Throwable) {
-                    throw new RuntimeException((Throwable) executionResult.getContext());
+                String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT);
+                this.sendEvent(destTopic, this.getFuncEventSerializer().serialize(destTopic, executionResult));
+
+                if (executionResult.getError() != null) {
+                    throw executionResult.getError();
                 }
                 throw new RuntimeException(this.funcContextSerDes.serialize(executionResult.getContext()));
             }
             if (executionResult.getType() == Type.TRANSIENT || executionResult.getType() == Type.END) {
+                String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT);
+                this.sendEvent(destTopic, this.getFuncEventSerializer().serialize(destTopic, executionResult));
+
                 return executionResult;
             } else {
                 newFunctionEvent = executionResult;
             }
+
         }
         String destinationTopic = getTopicResolver().resolveTopicName(newFunctionEvent.getType());
         this.sendEventAndWait(destinationTopic, null, newFunctionEvent);
@@ -400,22 +428,6 @@ public class FuncEngine<T> {
 
     public void setFuncSerDes(FuncSerDes funcSerDes) {
         this.funcSerDes = funcSerDes;
-    }
-
-    private Properties getProducerProperties() {
-        Properties producerProperties = new Properties();
-        producerProperties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getProperty("bootstrap.servers"));
-        producerProperties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        producerProperties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-        producerProperties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
-        producerProperties.setProperty(ProducerConfig.RETRIES_CONFIG, "10");
-        producerProperties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
-        producerProperties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
-        producerProperties.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
-        producerProperties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
-        producerProperties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32768));
-        producerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        return producerProperties;
     }
 
     private Properties getAdminClientProperties() {

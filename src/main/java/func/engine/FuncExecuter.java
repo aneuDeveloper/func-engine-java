@@ -55,6 +55,7 @@ public class FuncExecuter<T> {
         endEvent.setType(FuncEvent.Type.END);
         endEvent.setProcessInstanceID(functionEvent.getProcessInstanceID());
         endEvent.setComingFromId(functionEvent.getId());
+        endEvent.setContext(functionEvent.getContext());
         return endEvent;
     }
 
@@ -62,13 +63,9 @@ public class FuncExecuter<T> {
             throws InterruptedException, ExecutionException {
         IFunc function = this.getFunctionObj(functionEvent);
         if (functionEvent.getType() == FuncEvent.Type.TRANSIENT) {
-            LOGGER.trace("Execute transient function id={} functionId={} function={}", new Object[] {
-                    functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
             return this.executeTransientFunction(functionEvent, (Func<T>) function);
         }
         if (FuncAsync.class.isAssignableFrom(function.getClass())) {
-            LOGGER.trace("Execute async function id={} functionId={} function={}", new Object[] {
-                    functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
             return this.executeStatefulAsyncFunction(functionEvent, (FuncAsync<T>) function);
         }
         LOGGER.trace("Execute stateful function id={} functionId={} function={}", new Object[] {
@@ -100,27 +97,58 @@ public class FuncExecuter<T> {
         return result;
     }
 
-    protected FuncEvent<T> executeTransientFunction(FuncEvent<T> functionEvent, Func<T> function)
-            throws InterruptedException, ExecutionException {
-        FuncEvent<T> result = function.work(functionEvent);
-        this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT), null,
-                functionEvent);
-        if (result == null) {
-            FuncEvent<T> endEvent = this.createEndEvent(functionEvent);
-            this.functionWorkflow.sendEvent(this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT), null,
-                    endEvent);
-            return endEvent;
+    protected FuncEvent<T> executeTransientFunction(FuncEvent<T> functionEvent, Func<T> function) {
+        if (functionEvent != null) {
+            LOGGER.trace("Execute transient function id={} functionId={} function={}", new Object[] {
+                    functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
         }
-        if (result.getType() == Type.TRANSIENT) {
-            result = this.executeMessage(result);
-        } else if (result.getType() == Type.RETRY) {
-            // TODO: wait in case of transient for retry
+        String destTopic = null;
+        byte[] originalEvent = null;
+        try {
+            destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT);
+            originalEvent = this.functionWorkflow.getFuncEventSerializer().serialize(destTopic, functionEvent);
+
+            FuncEvent<T> result = function.work(functionEvent);
+
+            if (result == null) {
+                FuncEvent<T> endEvent = this.createEndEvent(functionEvent);
+                this.functionWorkflow.sendEvent(destTopic, null, endEvent);
+                return endEvent;
+            }
+            if (result.getType() == Type.TRANSIENT) {
+                if (result.getNextRetryAt() != null) {
+                    long millisToWait = (result.getNextRetryAt().toEpochSecond() * 1000) - System.currentTimeMillis();
+                    if (millisToWait > 0) {
+                        Thread.sleep(millisToWait);
+                    }
+                }
+                IFunc nextFunction = this.getFunctionObj(result);
+                result = this.executeTransientFunction(result, (Func<T>) nextFunction);
+            }
+            return result;
+        } catch (Throwable e) {
+            FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
+            nextFunction.setProcessName(functionEvent.getProcessName());
+            nextFunction.setComingFromId(functionEvent.getId());
+            nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
+            nextFunction.setType(FuncEvent.Type.ERROR);
+            nextFunction.setError(e);
+            return nextFunction;
+        } finally {
+            if (destTopic == null) {
+                destTopic = "TRANSIENT";
+            }
+            if (originalEvent != null) {
+                this.functionWorkflow.sendEvent(destTopic, originalEvent);
+            }
         }
-        return result;
     }
 
     private FuncEvent<T> executeStatefulAsyncFunction(FuncEvent<T> functionEvent, FuncAsync<T> function)
             throws InterruptedException, ExecutionException {
+        LOGGER.trace("Execute async function id={} functionId={} function={}", new Object[] {
+                functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
+
         if (functionEvent.getCorrelationState() == null) {
             FuncEvent<T> correlationEvent = function.createCorrelation(functionEvent);
             if (correlationEvent == null) {

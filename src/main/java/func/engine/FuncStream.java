@@ -64,7 +64,8 @@ public class FuncStream<T> {
     }
 
     private boolean shouldExecuteFuntion(String key, FuncEvent<T> value) {
-        boolean shouldExecute = (value.getType() == null || value.getType() == FuncEvent.Type.WORKFLOW)
+        boolean shouldExecute = (value.getType() == null || value.getType() == FuncEvent.Type.WORKFLOW
+                || value.getType() == FuncEvent.Type.TRANSIENT)
                 && value.getFunction() != null && !value.getFunction().isBlank();
         return shouldExecute;
     }
@@ -106,6 +107,9 @@ public class FuncStream<T> {
     }
 
     private String toTopic(String key, FuncEvent<T> functionEvent, RecordContext recordContext) {
+        if(functionEvent.getNextRetryAt() != null){
+            return this.processDefinition.getTopicResolver().getRetryTopic();
+        }
         String topic = this.processDefinition.getTopicResolver().resolveTopicName(functionEvent.getType());
         return topic;
     }
