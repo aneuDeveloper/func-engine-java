@@ -111,21 +111,7 @@ public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
                     break;
                 }
                 case "nextRetryAt": {
-                    try {
-                        functionEvent.setNextRetryAt(ZonedDateTime.parse(keyValuePair[1]));
-                    } catch (RuntimeException e) {
-                        LOGGER.error(
-                                "Could not parse NextRetryAt=" + keyValuePair[1] + " trying to parse other dateformet.",
-                                e);
-                        try {
-                            Date parsedNextRetryAt = FuncEventSerializer.DATE_FORMAT.parse(keyValuePair[1]);
-                            ZoneId id = ZoneId.systemDefault();
-                            ZonedDateTime ofInstant = ZonedDateTime.ofInstant(parsedNextRetryAt.toInstant(), id);
-                            functionEvent.setNextRetryAt(ofInstant);
-                        } catch (ParseException parseException) {
-                            LOGGER.error(parseException.getMessage(), parseException);
-                        }
-                    }
+                    functionEvent.setNextRetryAt(this.parseDateFromMillis(keyValuePair[1]));
                     break;
                 }
                 case "sourceTopic": {

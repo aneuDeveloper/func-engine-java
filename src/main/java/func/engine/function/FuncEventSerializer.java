@@ -60,8 +60,7 @@ public class FuncEventSerializer<T> implements Serializer<FuncEvent<T>> {
         }
 
         if (functionEvent.getNextRetryAt() != null) {
-            builder.append(",nextRetryAt=")
-                    .append(DateTimeFormatter.ISO_INSTANT.format(functionEvent.getNextRetryAt()));
+            builder.append(",nextRetryAt=").append(functionEvent.getNextRetryAt().toInstant().toEpochMilli());
         }
         if (functionEvent.getSourceTopic() != null) {
             builder.append(",sourceTopic=").append(functionEvent.getSourceTopic());
