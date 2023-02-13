@@ -108,7 +108,7 @@ public class FuncStream<T> {
 
     private String toTopic(String key, FuncEvent<T> functionEvent, RecordContext recordContext) {
         if(functionEvent.getNextRetryAt() != null){
-            return this.processDefinition.getTopicResolver().getRetryTopic();
+            return this.processDefinition.getTopicResolver().getDelayTopic();
         }
         String topic = this.processDefinition.getTopicResolver().resolveTopicName(functionEvent.getType());
         return topic;

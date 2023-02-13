@@ -20,7 +20,6 @@ import func.engine.correlation.CorrelationState;
 public class FuncEvent<T> {
     public static enum Type {
         END, CORRELATION, CALLBACK, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR;
-        // END, CORRELATION, CALLBACK, DEAD_LETTER, RETRY, WORKFLOW, TRANSIENT, ERROR;
     }
 
     public static final String VERSION = "v";

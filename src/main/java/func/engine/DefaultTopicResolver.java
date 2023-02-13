@@ -26,9 +26,6 @@ public class DefaultTopicResolver implements TopicResolver {
         }
         switch (functionType) {
             case TRANSIENT:
-            // case RETRY: {
-            //     return functionType.name();
-            // }
             case CALLBACK:
             case CORRELATION: {
                 return this.prefix + functionType.name();
@@ -40,7 +37,7 @@ public class DefaultTopicResolver implements TopicResolver {
     }
 
     @Override
-    public String getRetryTopic() {
-        return "RETRY";
+    public String getDelayTopic() {
+        return "DELAY";
     }
 }

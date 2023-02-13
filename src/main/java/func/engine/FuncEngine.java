@@ -190,7 +190,7 @@ public class FuncEngine<T> {
             requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK));
         }
         requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT));
-        requiredTopics.add(getTopicResolver().getRetryTopic());
+        requiredTopics.add(getTopicResolver().getDelayTopic());
         Properties properties = this.getAdminClientProperties();
         AdminClient adminClient = AdminClient.create(properties);
         if (adminClient == null) {
