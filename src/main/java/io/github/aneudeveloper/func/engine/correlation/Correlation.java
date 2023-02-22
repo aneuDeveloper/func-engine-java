@@ -8,36 +8,8 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 */
-package func.engine;
+package io.github.aneudeveloper.func.engine.correlation;
 
-import func.engine.function.FuncEvent;
-
-public class DefaultTopicResolver implements TopicResolver {
-    private String prefix;
-
-    public DefaultTopicResolver(String prefix) {
-        this.prefix = prefix;
-    }
-
-    @Override
-    public String resolveTopicName(FuncEvent.Type functionType) {
-        if (functionType == null) {
-            functionType = FuncEvent.Type.WORKFLOW;
-        }
-        switch (functionType) {
-            case TRANSIENT:
-            case CALLBACK:
-            case CORRELATION: {
-                return this.prefix + functionType.name();
-            }
-            default:
-                return this.prefix + FuncEvent.Type.WORKFLOW.name();
-        }
-
-    }
-
-    @Override
-    public String getDelayTopic() {
-        return "DELAY";
-    }
+public interface Correlation {
+    public String getValue();
 }

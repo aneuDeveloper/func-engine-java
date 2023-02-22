@@ -8,37 +8,10 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 */
-package func.engine;
+package io.github.aneudeveloper.func.engine.function;
 
-import func.engine.function.IFunc;
+public interface FuncAsync<T> extends IFunc {
+    public FuncEvent<T> createCorrelation(FuncEvent<T> functionEvent);
 
-public class WorkflowStart<T> {
-    private T context;
-    protected IFunc function;
-    private boolean transientFunction;
-
-    public T getContext() {
-        return this.context;
-    }
-
-    public void setContext(T data) {
-        this.context = data;
-    }
-
-    public IFunc getFunction() {
-        return this.function;
-    }
-
-    public void setFunction(IFunc function) {
-        this.function = function;
-    }
-
-    public boolean isTransientFunction() {
-        return transientFunction;
-    }
-
-    public void setTransientFunction(boolean transientFunction) {
-        this.transientFunction = transientFunction;
-    }
-
+    public FuncEvent<T> continueFunction(FuncEvent<T> functionEvent);
 }

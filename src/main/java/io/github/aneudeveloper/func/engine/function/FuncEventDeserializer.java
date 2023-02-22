@@ -8,7 +8,7 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 */
-package func.engine.function;
+package io.github.aneudeveloper.func.engine.function;
 
 import java.text.ParseException;
 import java.time.Instant;
@@ -20,8 +20,8 @@ import org.apache.kafka.common.serialization.Deserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import func.engine.correlation.CorrelationState;
-import func.engine.function.FuncEvent.Type;
+import io.github.aneudeveloper.func.engine.correlation.CorrelationState;
+import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
 
 public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncEventDeserializer.class);

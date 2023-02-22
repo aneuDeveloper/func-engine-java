@@ -8,26 +8,22 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 */
-package func.engine.correlation;
+package io.github.aneudeveloper.func.engine.function;
 
-public class ProcessCorrelation<T> {
-    private String correlationId;
-    private T data;
+import org.apache.kafka.streams.KeyValue;
+import org.apache.kafka.streams.kstream.Transformer;
+import org.apache.kafka.streams.processor.ProcessorContext;
 
-    public String getCorrelationId() {
-        return this.correlationId;
+public abstract class FuncEventTransformer<T> implements Transformer<String, FuncEvent<T>, KeyValue<String, FuncEvent<T>>> {
+    protected ProcessorContext context;
+
+    public void init(ProcessorContext context) {
+        this.context = context;
     }
 
-    public void setCorrelationId(String correlationId) {
-        this.correlationId = correlationId;
-    }
+    public abstract KeyValue<String, FuncEvent<T>> transform(String key, FuncEvent<T> functionEvent);
 
-    public T getData() {
-        return this.data;
-    }
-
-    public void setData(T data) {
-        this.data = data;
+    public void close() {
     }
 }
 

@@ -8,10 +8,9 @@
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 * 
 */
-package func.engine.function;
+package io.github.aneudeveloper.func.engine.correlation;
 
-public interface FuncAsync<T> extends IFunc {
-    public FuncEvent<T> createCorrelation(FuncEvent<T> functionEvent);
-
-    public FuncEvent<T> continueFunction(FuncEvent<T> functionEvent);
+public interface CorrelationMerger<T> {
+    public T mergeCorrelation(T context1, T context2, CorrelationContext correlationContext);
 }
+

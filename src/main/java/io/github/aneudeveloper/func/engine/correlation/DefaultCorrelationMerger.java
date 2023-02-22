@@ -1,4 +1,4 @@
-package func.engine.correlation;
+package io.github.aneudeveloper.func.engine.correlation;
 
 public class DefaultCorrelationMerger<T> implements CorrelationMerger<T>{
 
