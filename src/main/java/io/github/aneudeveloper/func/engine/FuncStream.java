@@ -64,8 +64,7 @@ public class FuncStream<T> {
     }
 
     private boolean shouldExecuteFuntion(String key, FuncEvent<T> value) {
-        boolean shouldExecute = (value.getType() == null || value.getType() == FuncEvent.Type.WORKFLOW
-                || value.getType() == FuncEvent.Type.TRANSIENT)
+        boolean shouldExecute = (value.getType() == null || value.getType() == FuncEvent.Type.WORKFLOW)
                 && value.getFunction() != null && !value.getFunction().isBlank();
         return shouldExecute;
     }

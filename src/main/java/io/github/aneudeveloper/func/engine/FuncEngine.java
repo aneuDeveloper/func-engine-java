@@ -76,6 +76,7 @@ public class FuncEngine<T> {
     private TopicResolver topicResolver;
     private FuncExecuter<T> processEventExecuter;
     private boolean startCorrelation = true;
+    private boolean createMissingTopics = true;
     private FuncEventSerializer<T> funcEventSerializer;
 
     public FuncEngine(Properties properties) {
@@ -135,8 +136,12 @@ public class FuncEngine<T> {
         allProcessTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
         LOG.info("Observed workflow topics: {}", allProcessTopics);
         Set<String> missingTopics = this.getMissingTopics(allProcessTopics);
-        LOG.info("Missing topics: {}", missingTopics);
-        this.createTopics(missingTopics);
+        if (createMissingTopics) {
+            LOG.info("Following topics will be created: {}", missingTopics);
+            this.createTopics(missingTopics);
+        } else {
+            LOG.info("Missing topics: {}", missingTopics);
+        }
 
         funcStream = new FuncStream<T>(this, this.processEventExecuter);
         funcStream.start(allProcessTopics);
@@ -451,5 +456,9 @@ public class FuncEngine<T> {
 
     public void setTopicResolver(TopicResolver topicResolver) {
         this.topicResolver = topicResolver;
+    }
+
+    public void setCreateMissingTopics(boolean createMissingTopics) {
+        this.createMissingTopics = createMissingTopics;
     }
 }

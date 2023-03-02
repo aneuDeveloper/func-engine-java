@@ -26,6 +26,7 @@ public class DefaultTopicResolver implements TopicResolver {
         }
         switch (functionType) {
             case TRANSIENT:
+                return "TRANSIENT";
             case CALLBACK:
             case CORRELATION: {
                 return this.prefix + functionType.name();
