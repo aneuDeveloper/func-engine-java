@@ -78,6 +78,7 @@ public class FuncEngine<T> {
     private boolean startCorrelation = true;
     private boolean createMissingTopics = true;
     private FuncEventSerializer<T> funcEventSerializer;
+    private SendEventExceptionHandler sendEventExceptionHandler;
 
     public FuncEngine(Properties properties) {
         if (properties == null) {
@@ -272,16 +273,19 @@ public class FuncEngine<T> {
     }
 
     public void sendEvent(String destinationTopic, String key, FuncEvent<T> functionEvent) {
-        FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
-        byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
-        ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
-        this.kafkaProducer.send(record);
-        this.kafkaProducer.flush();
-    }
-
-    public void sendEventSync(String destinationTopic, String key, FuncEvent<T> functionEvent)
-            throws InterruptedException, ExecutionException {
-        this.sendEventSync(destinationTopic, key, functionEvent);
+        try {
+            FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
+            byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
+            this.kafkaProducer.send(record);
+            this.kafkaProducer.flush();
+        } catch (Exception e) {
+            if (sendEventExceptionHandler != null) {
+                sendEventExceptionHandler.onException(e, destinationTopic, key, functionEvent);
+            } else {
+                throw e;
+            }
+        }
     }
 
     public void sendEventAndWait(String destinationTopic, String key, FuncEvent<T> functionEvent)
@@ -294,14 +298,30 @@ public class FuncEngine<T> {
     }
 
     public void sendEvent(String destinationTopic, byte[] message) {
-        ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, message);
-        this.kafkaProducer.send(record);
-        this.kafkaProducer.flush();
+        try {
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, message);
+            this.kafkaProducer.send(record);
+            this.kafkaProducer.flush();
+        } catch (Exception e) {
+            if (sendEventExceptionHandler != null) {
+                sendEventExceptionHandler.onException(e, destinationTopic, message);
+            } else {
+                throw e;
+            }
+        }
     }
 
     public void sendEvent(FuncEvent<T> functionEvent) {
-        String destinationTopic = getTopicResolver().resolveTopicName(functionEvent.getType());
-        this.sendEvent(destinationTopic, null, functionEvent);
+        try {
+            String destinationTopic = getTopicResolver().resolveTopicName(functionEvent.getType());
+            this.sendEvent(destinationTopic, null, functionEvent);
+        } catch (Exception e) {
+            if (sendEventExceptionHandler != null) {
+                sendEventExceptionHandler.onException(e, functionEvent);
+            } else {
+                throw e;
+            }
+        }
     }
 
     public String getProcessName() {
@@ -460,5 +480,13 @@ public class FuncEngine<T> {
 
     public void setCreateMissingTopics(boolean createMissingTopics) {
         this.createMissingTopics = createMissingTopics;
+    }
+
+    public SendEventExceptionHandler getSendEventExceptionHandler() {
+        return sendEventExceptionHandler;
+    }
+
+    public void setSendEventExceptionHandler(SendEventExceptionHandler sendEventExceptionHandler) {
+        this.sendEventExceptionHandler = sendEventExceptionHandler;
     }
 }
