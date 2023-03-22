@@ -180,8 +180,12 @@ public class FuncEngine<T> {
 
     public void close() {
         LOG.info("Caught shutdown hook!");
-        this.funcStream.close();
-        this.kafkaProducer.close();
+        if (this.funcStream != null) {
+            this.funcStream.close();
+        }
+        if (this.kafkaProducer != null) {
+            this.kafkaProducer.close();
+        }
         if (this.correlationStream != null) {
             this.correlationStream.close();
         }
@@ -273,6 +277,9 @@ public class FuncEngine<T> {
     }
 
     public void sendEvent(String destinationTopic, String key, FuncEvent<T> functionEvent) {
+        if (this.kafkaProducer == null) {
+            return;
+        }
         try {
             FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
             byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
@@ -290,14 +297,28 @@ public class FuncEngine<T> {
 
     public void sendEventAndWait(String destinationTopic, String key, FuncEvent<T> functionEvent)
             throws InterruptedException, ExecutionException {
-        FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
-        byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
-        ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
-        this.kafkaProducer.send(record).get();
-        this.kafkaProducer.flush();
+        if (this.kafkaProducer == null) {
+            return;
+        }
+        try {
+            FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
+            byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
+            this.kafkaProducer.send(record).get();
+            this.kafkaProducer.flush();
+        } catch (Exception e) {
+            if (sendEventExceptionHandler != null) {
+                sendEventExceptionHandler.onException(e, destinationTopic, key, functionEvent);
+            } else {
+                throw e;
+            }
+        }
     }
 
     public void sendEvent(String destinationTopic, byte[] message) {
+        if (this.kafkaProducer == null) {
+            return;
+        }
         try {
             ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, message);
             this.kafkaProducer.send(record);
@@ -312,6 +333,9 @@ public class FuncEngine<T> {
     }
 
     public void sendEvent(FuncEvent<T> functionEvent) {
+        if (this.kafkaProducer == null) {
+            return;
+        }
         try {
             String destinationTopic = getTopicResolver().resolveTopicName(functionEvent.getType());
             this.sendEvent(destinationTopic, null, functionEvent);
