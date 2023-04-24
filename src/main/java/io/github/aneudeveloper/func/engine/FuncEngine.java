@@ -75,8 +75,6 @@ public class FuncEngine<T> {
     private CorrelationMerger<T> correlationMerger;
     private TopicResolver topicResolver;
     private FuncExecuter<T> processEventExecuter;
-    private boolean startCorrelation = true;
-    private boolean createMissingTopics = true;
     private FuncEventSerializer<T> funcEventSerializer;
     private SendEventExceptionHandler sendEventExceptionHandler;
 
@@ -133,28 +131,30 @@ public class FuncEngine<T> {
 
         this.kafkaProducer = new KafkaProducer<>(producerProperties);
 
-        HashSet<String> allProcessTopics = new HashSet<>();
-        allProcessTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
-        LOG.info("Observed workflow topics: {}", allProcessTopics);
-        Set<String> missingTopics = this.getMissingTopics(allProcessTopics);
-        if (createMissingTopics) {
+        String workflowTopic = getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW);
+        LOG.info("Observe workflow topic: {}", workflowTopic);
+
+        funcStream = new FuncStream<T>(this, this.processEventExecuter);
+        funcStream.start(List.of(workflowTopic));
+    }
+
+    public void startCorrelationStream() {
+        if (this.correlationMerger == null) {
+            this.correlationMerger = new DefaultCorrelationMerger<T>();
+        }
+        if (this.correlationStream == null) {
+            this.correlationStream = new CorrelationStream<T>(this);
+        }
+        this.correlationStream.startStreaming();
+    }
+
+    public void createMissingTopics(boolean includeCorrelation) {
+        Set<String> missingTopics = this.getMissingTopics(includeCorrelation);
+        if (missingTopics != null && !missingTopics.isEmpty()) {
             LOG.info("Following topics will be created: {}", missingTopics);
             this.createTopics(missingTopics);
         } else {
-            LOG.info("Missing topics: {}", missingTopics);
-        }
-
-        funcStream = new FuncStream<T>(this, this.processEventExecuter);
-        funcStream.start(allProcessTopics);
-
-        if (startCorrelation) {
-            if (this.correlationMerger == null) {
-                this.correlationMerger = new DefaultCorrelationMerger<T>();
-            }
-            if (this.correlationStream == null) {
-                this.correlationStream = new CorrelationStream<T>(this);
-            }
-            this.correlationStream.startStreaming();
+            LOG.info("There are no missing topics");
         }
     }
 
@@ -192,10 +192,11 @@ public class FuncEngine<T> {
         LOG.info("Application exited.");
     }
 
-    private Set<String> getMissingTopics(Collection<String> aAllTopics) {
+    private Set<String> getMissingTopics(boolean includeCorrelation) {
         Set<String> topicsToCreate = new HashSet<>();
-        ArrayList<String> requiredTopics = new ArrayList<>(aAllTopics);
-        if (this.startCorrelation) {
+        ArrayList<String> requiredTopics = new ArrayList<>();
+        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
+        if (includeCorrelation) {
             requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CORRELATION));
             requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK));
         }
@@ -369,25 +370,31 @@ public class FuncEngine<T> {
         return processEventSerde;
     }
 
-    public FuncEvent<T> startProcess(WorkflowStart<T> processInstance) throws Throwable {
-        if (processInstance.getFunction() == null) {
+    public FuncEvent<T> execute(FuncEvent<T> newFunctionEvent) throws Throwable {
+        if (newFunctionEvent.getFunctionObj() == null) {
             throw new IllegalStateException(
                     "Missing function. Please provide which function should be called at start.");
         }
-        UUID processInstanceID = UUID.randomUUID();
-        FuncEvent<T> newFunctionEvent = FuncEvent.createWithDefaultValues();
-        newFunctionEvent.setType(FuncEvent.Type.WORKFLOW);
-        newFunctionEvent.setFunction(this.funcSerDes.serialize(processInstance.getFunction()));
-        newFunctionEvent.setProcessInstanceID(processInstanceID.toString());
-        newFunctionEvent.setContext(processInstance.getContext());
+        if (newFunctionEvent.getType() == null) {
+            throw new IllegalStateException("Function type must be specified.");
+        }
+        if (newFunctionEvent.getId() == null) {
+            throw new IllegalStateException("id must be specified");
+        }
+        if (newFunctionEvent.getFunction() == null && this.funcSerDes != null) {
+            newFunctionEvent.setFunction(this.funcSerDes.serialize(newFunctionEvent.getFunctionObj()));
+        }
+
+        if (newFunctionEvent.getProcessInstanceID() == null) {
+            newFunctionEvent.setProcessInstanceID(UUID.randomUUID().toString());
+        }
         newFunctionEvent.setProcessName(this.getProcessName());
-        if (processInstance.isTransientFunction()) {
-            if (!(processInstance.getFunction() instanceof Func)) {
+        if (newFunctionEvent.getType() == FuncEvent.Type.TRANSIENT) {
+            if (!(newFunctionEvent.getFunctionObj() instanceof Func)) {
                 throw new IllegalStateException("A transient function should be of type " + Func.class.getName());
             }
-            newFunctionEvent.setType(FuncEvent.Type.TRANSIENT);
             FuncEvent<T> executionResult = this.processEventExecuter.executeTransientFunction(newFunctionEvent,
-                    (Func<T>) processInstance.getFunction());
+                    (Func<T>) newFunctionEvent.getFunctionObj());
 
             if (executionResult.getType() == FuncEvent.Type.ERROR) {
                 String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT);
@@ -487,10 +494,6 @@ public class FuncEngine<T> {
         return properties;
     }
 
-    public void setStartCorrelation(boolean startCorrelation) {
-        this.startCorrelation = startCorrelation;
-    }
-
     public TopicResolver getTopicResolver() {
         if (this.topicResolver == null) {
             this.topicResolver = new DefaultTopicResolver(this.processName + "-");
@@ -502,8 +505,12 @@ public class FuncEngine<T> {
         this.topicResolver = topicResolver;
     }
 
-    public void setCreateMissingTopics(boolean createMissingTopics) {
-        this.createMissingTopics = createMissingTopics;
+    public SendEventExceptionHandler getSendEventExceptionHandler() {
+        return sendEventExceptionHandler;
+    }
+
+    public void setSendEventExceptionHandler(SendEventExceptionHandler sendEventExceptionHandler) {
+        this.sendEventExceptionHandler = sendEventExceptionHandler;
     }
 
     public SendEventExceptionHandler getSendEventExceptionHandler() {
