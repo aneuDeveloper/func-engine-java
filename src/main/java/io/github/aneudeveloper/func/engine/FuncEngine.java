@@ -512,12 +512,4 @@ public class FuncEngine<T> {
     public void setSendEventExceptionHandler(SendEventExceptionHandler sendEventExceptionHandler) {
         this.sendEventExceptionHandler = sendEventExceptionHandler;
     }
-
-    public SendEventExceptionHandler getSendEventExceptionHandler() {
-        return sendEventExceptionHandler;
-    }
-
-    public void setSendEventExceptionHandler(SendEventExceptionHandler sendEventExceptionHandler) {
-        this.sendEventExceptionHandler = sendEventExceptionHandler;
-    }
 }
