@@ -15,11 +15,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import io.github.aneudeveloper.func.engine.Retries;
-import io.github.aneudeveloper.func.engine.correlation.CorrelationState;
 
 public class FuncEvent<T> {
     public static enum Type {
-        END, CORRELATION, CALLBACK, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR;
+        END, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR;
     }
 
     public static final String VERSION = "v";
@@ -28,8 +27,6 @@ public class FuncEvent<T> {
     public static final String COMING_FROM_ID = "comingFromId";
     public static final String FUNCTION = "function";
     public static final String PROCESS_INSTANCE_ID = "processInstanceID";
-    public static final String CORRELATION_STATE = "correlationState";
-    public static final String CORRELATION_ID = "correlationId";
     public static final String RETRY_COUNT = "retryCount";
     public static final String NEXT_RETRY_AT = "nextRetryAt";
     public static final String SOURCE_TOPIC = "sourceTopic";
@@ -47,9 +44,7 @@ public class FuncEvent<T> {
     private ZonedDateTime nextRetryAt;
     private int retryCount;
     private String sourceTopic;
-    private CorrelationState correlationState;
 
-    private volatile String correlationId;
     private volatile IFunc functionObj;
     private volatile T context;
     private volatile Throwable error;
@@ -119,22 +114,6 @@ public class FuncEvent<T> {
         this.retryCount = retryCount;
     }
 
-    public CorrelationState getCorrelationState() {
-        return this.correlationState;
-    }
-
-    public void setCorrelationState(CorrelationState correlationState) {
-        this.correlationState = correlationState;
-    }
-
-    public String getCorrelationId() {
-        return this.correlationId;
-    }
-
-    public void setCorrelationId(String correlationId) {
-        this.correlationId = correlationId;
-    }
-
     public String getFunction() {
         return this.function;
     }
@@ -191,30 +170,14 @@ public class FuncEvent<T> {
         this.error = error;
     }
 
-    public static final <T> FuncEvent<T> createWithDefaultValues() {
+    public static final <T> FuncEvent<T> newEvent() {
         FuncEvent<T> functionEvent = new FuncEvent<>(FuncEventDeserializer.VERSION, UUID.randomUUID().toString());
         functionEvent.setTimeStamp(ZonedDateTime.now());
         return functionEvent;
     }
 
-    public FuncEvent<T> correlation(String correlationId) {
-        if (correlationId == null) {
-            throw new IllegalStateException("CorrelationId must be specified.");
-        }
-        FuncEvent<T> correlation = FuncEvent.createWithDefaultValues();
-        correlation.setProcessName(getProcessName());
-        correlation.setProcessInstanceID(getProcessInstanceID());
-        correlation.setType(FuncEvent.Type.CORRELATION);
-        correlation.setCorrelationState(CorrelationState.INITIALIZED);
-        correlation.setCorrelationId(correlationId);
-        correlation.setFunction(getFunction());
-        correlation.setComingFromId(getId());
-        correlation.setContext(getContext());
-        return correlation;
-    }
-
     public FuncEvent<T> next(IFunc nextFunction) {
-        FuncEvent<T> nextFunctionEvent = FuncEvent.createWithDefaultValues();
+        FuncEvent<T> nextFunctionEvent = FuncEvent.newEvent();
         nextFunctionEvent.setProcessName(getProcessName());
         nextFunctionEvent.setComingFromId(getId());
         nextFunctionEvent.setProcessInstanceID(getProcessInstanceID());
@@ -225,7 +188,7 @@ public class FuncEvent<T> {
     }
 
     public FuncEvent<T> nextTransient(IFunc function) {
-        FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
+        FuncEvent<T> nextFunction = FuncEvent.newEvent();
         nextFunction.setProcessName(getProcessName());
         nextFunction.setComingFromId(getId());
         nextFunction.setProcessInstanceID(getProcessInstanceID());
@@ -262,7 +225,7 @@ public class FuncEvent<T> {
         long jdf = choosenRetryUnitWithNumber.getTime();
         ZonedDateTime nextRetryAt = currentTime.plus(jdf, choosenRetryUnitWithNumber.getTimeUnit());
 
-        FuncEvent<T> retry = FuncEvent.createWithDefaultValues();
+        FuncEvent<T> retry = FuncEvent.newEvent();
         retry.setProcessName(getProcessName());
         retry.setComingFromId(getId());
         retry.setType(FuncEvent.Type.WORKFLOW);

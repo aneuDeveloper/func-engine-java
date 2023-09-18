@@ -15,9 +15,7 @@ import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.aneudeveloper.func.engine.correlation.CorrelationState;
 import io.github.aneudeveloper.func.engine.function.Func;
-import io.github.aneudeveloper.func.engine.function.FuncAsync;
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
 import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
 import io.github.aneudeveloper.func.engine.function.IFunc;
@@ -39,7 +37,7 @@ public class FuncExecuter<T> {
         } catch (Throwable e) {
             LOGGER.error("Error while executing function. ProcessInstanceID=" + functionEvent.getProcessInstanceID()
                     + " functionId=" + functionEvent.getId(), e);
-            FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
+            FuncEvent<T> nextFunction = FuncEvent.newEvent();
             nextFunction.setProcessName(functionEvent.getProcessName());
             nextFunction.setComingFromId(functionEvent.getId());
             nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
@@ -50,7 +48,7 @@ public class FuncExecuter<T> {
     }
 
     private FuncEvent<T> createEndEvent(FuncEvent<T> functionEvent) {
-        FuncEvent<T> endEvent = FuncEvent.createWithDefaultValues();
+        FuncEvent<T> endEvent = FuncEvent.newEvent();
         endEvent.setProcessName(functionEvent.getProcessName());
         endEvent.setType(FuncEvent.Type.END);
         endEvent.setProcessInstanceID(functionEvent.getProcessInstanceID());
@@ -64,9 +62,6 @@ public class FuncExecuter<T> {
         IFunc function = this.getFunctionObj(functionEvent);
         if (functionEvent.getType() == FuncEvent.Type.TRANSIENT) {
             return this.executeTransientFunction(functionEvent, (Func<T>) function);
-        }
-        if (FuncAsync.class.isAssignableFrom(function.getClass())) {
-            return this.executeStatefulAsyncFunction(functionEvent, (FuncAsync<T>) function);
         }
         LOGGER.trace("Execute stateful function id={} functionId={} function={}", new Object[] {
                 functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
@@ -127,7 +122,7 @@ public class FuncExecuter<T> {
             }
             return result;
         } catch (Throwable e) {
-            FuncEvent<T> nextFunction = FuncEvent.createWithDefaultValues();
+            FuncEvent<T> nextFunction = FuncEvent.newEvent();
             nextFunction.setProcessName(functionEvent.getProcessName());
             nextFunction.setComingFromId(functionEvent.getId());
             nextFunction.setProcessInstanceID(functionEvent.getProcessInstanceID());
@@ -142,29 +137,5 @@ public class FuncExecuter<T> {
                 this.functionWorkflow.sendEvent(destTopic, originalEvent);
             }
         }
-    }
-
-    private FuncEvent<T> executeStatefulAsyncFunction(FuncEvent<T> functionEvent, FuncAsync<T> function)
-            throws InterruptedException, ExecutionException {
-        LOGGER.trace("Execute async function id={} functionId={} function={}", new Object[] {
-                functionEvent.getProcessInstanceID(), functionEvent.getId(), functionEvent.getFunction() });
-
-        if (functionEvent.getCorrelationState() == null) {
-            FuncEvent<T> correlationEvent = function.createCorrelation(functionEvent);
-            if (correlationEvent == null) {
-                throw new IllegalStateException(
-                        String.format("No correlation specified for processInstanceId=%s and functionId=%s",
-                                functionEvent.getProcessInstanceID(), functionEvent.getId()));
-            }
-            return correlationEvent;
-        }
-        if (functionEvent.getCorrelationState() == CorrelationState.CALLBACK_FORWARDED) {
-            FuncEvent<T> result = function.continueFunction(functionEvent);
-            if (result == null) {
-                return this.createEndEvent(functionEvent);
-            }
-            return result;
-        }
-        throw new IllegalStateException("Could not execute async step.");
     }
 }

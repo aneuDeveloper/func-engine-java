@@ -10,17 +10,14 @@
 */
 package io.github.aneudeveloper.func.engine.function;
 
-import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Date;
 
 import org.apache.kafka.common.serialization.Deserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.aneudeveloper.func.engine.correlation.CorrelationState;
 import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
 
 public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
@@ -100,10 +97,6 @@ public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
                 }
                 case "processStep": {
                     functionEvent.setFunction(keyValuePair[1]);
-                    break;
-                }
-                case "correlationState": {
-                    functionEvent.setCorrelationState(CorrelationState.valueOf(keyValuePair[1]));
                     break;
                 }
                 case "retryCount": {

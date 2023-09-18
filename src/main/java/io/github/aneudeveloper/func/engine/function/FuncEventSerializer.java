@@ -13,7 +13,6 @@ package io.github.aneudeveloper.func.engine.function;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.text.SimpleDateFormat;
-import java.time.format.DateTimeFormatter;
 
 import org.apache.kafka.common.serialization.Serializer;
 import org.slf4j.Logger;
@@ -64,9 +63,6 @@ public class FuncEventSerializer<T> implements Serializer<FuncEvent<T>> {
         }
         if (functionEvent.getSourceTopic() != null) {
             builder.append(",sourceTopic=").append(functionEvent.getSourceTopic());
-        }
-        if (functionEvent.getCorrelationState() != null) {
-            builder.append(",correlationState=").append(functionEvent.getCorrelationState());
         }
 
         builder.append(",$e%,");

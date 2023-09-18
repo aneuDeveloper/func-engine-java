@@ -95,10 +95,6 @@ public class FuncStream<T> {
     }
 
     private String selectTopicKey(String key, FuncEvent<T> functionEvent) {
-        if (functionEvent.getType() == FuncEvent.Type.CORRELATION) {
-            return functionEvent.getCorrelationId();
-        }
-        // TODO check if getId() is required by retries, probably not.
         if (functionEvent.getNextRetryAt() != null) {
             return functionEvent.getId();
         }

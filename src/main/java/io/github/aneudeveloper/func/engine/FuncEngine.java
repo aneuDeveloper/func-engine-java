@@ -10,12 +10,11 @@
 */
 package io.github.aneudeveloper.func.engine;
 
+import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -37,11 +36,6 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.aneudeveloper.func.engine.correlation.CorrelationMerger;
-import io.github.aneudeveloper.func.engine.correlation.CorrelationState;
-import io.github.aneudeveloper.func.engine.correlation.CorrelationStream;
-import io.github.aneudeveloper.func.engine.correlation.DefaultCorrelationMerger;
-import io.github.aneudeveloper.func.engine.correlation.ProcessCorrelation;
 import io.github.aneudeveloper.func.engine.function.Func;
 import io.github.aneudeveloper.func.engine.function.FuncContextSerDes;
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
@@ -50,29 +44,22 @@ import io.github.aneudeveloper.func.engine.function.FuncEventDeserializer;
 import io.github.aneudeveloper.func.engine.function.FuncEventSerializer;
 import io.github.aneudeveloper.func.engine.function.FuncSerDes;
 
-public class FuncEngine<T> {
+public class FuncEngine<T> implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(FuncEngine.class);
     public static final String PROCESS_NAME = "process.name";
     public static final String KAFKA_BOOTSTRAP_SERVERS = "bootstrap.servers";
-    public static final String SYNCHRONOUS_WAITHANDLER_STEAM_APPLICATION_NAME = "synchronous.waithandler.stream.application.name";
-    public static final String CORRELATION_STREAM_APPLICATION_NAME = "correlation.stream.application.name";
     public static final String WORKFLOW_STREAM_PREFIX = "workflow.stream.prefix";
     public static final String TOPIC_DEFAULT_NUM_PARTITIONS = "topic.default.num.partitions";
     public static final String TOPIC_DEFAULT_REPLICATION_FACTOR = "topic.default.replication.factor";
-    public static final String TOPIC_CORRELATION_RETENTION_MS = "topic.correlation.retention.ms";
-    public static final String TOPIC_CORRELATION_DETELE_RETENTION_MS = "topic.correlation.delete.retention.ms";
     public static final String STEPS_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
-    public static final String CORRELATION_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
     public static final String DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG = "default.deserialization.exception.handler";
 
     private KafkaProducer<String, byte[]> kafkaProducer;
     private String processName;
-    private CorrelationStream<T> correlationStream;
     private FuncStream<T> funcStream;
     private Properties properties;
     private FuncContextSerDes<T> funcContextSerDes;
     private FuncSerDes funcSerDes;
-    private CorrelationMerger<T> correlationMerger;
     private TopicResolver topicResolver;
     private FuncExecuter<T> processEventExecuter;
     private FuncEventSerializer<T> funcEventSerializer;
@@ -100,7 +87,7 @@ public class FuncEngine<T> {
             return;
         }
         Properties producerProperties = new Properties();
-        producerProperties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getProperty("bootstrap.servers"));
+        producerProperties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getProperty(KAFKA_BOOTSTRAP_SERVERS));
         producerProperties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         producerProperties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
         producerProperties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
@@ -138,18 +125,8 @@ public class FuncEngine<T> {
         funcStream.start(List.of(workflowTopic));
     }
 
-    public void startCorrelationStream() {
-        if (this.correlationMerger == null) {
-            this.correlationMerger = new DefaultCorrelationMerger<T>();
-        }
-        if (this.correlationStream == null) {
-            this.correlationStream = new CorrelationStream<T>(this);
-        }
-        this.correlationStream.startStreaming();
-    }
-
-    public void createMissingTopics(boolean includeCorrelation) {
-        Set<String> missingTopics = this.getMissingTopics(includeCorrelation);
+    public void createMissingTopics() {
+        Set<String> missingTopics = this.getMissingTopics();
         if (missingTopics != null && !missingTopics.isEmpty()) {
             LOG.info("Following topics will be created: {}", missingTopics);
             this.createTopics(missingTopics);
@@ -186,20 +163,13 @@ public class FuncEngine<T> {
         if (this.kafkaProducer != null) {
             this.kafkaProducer.close();
         }
-        if (this.correlationStream != null) {
-            this.correlationStream.close();
-        }
         LOG.info("Application exited.");
     }
 
-    private Set<String> getMissingTopics(boolean includeCorrelation) {
+    private Set<String> getMissingTopics() {
         Set<String> topicsToCreate = new HashSet<>();
         ArrayList<String> requiredTopics = new ArrayList<>();
         requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
-        if (includeCorrelation) {
-            requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CORRELATION));
-            requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK));
-        }
         requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT));
         requiredTopics.add(getTopicResolver().getDelayTopic());
         Properties properties = this.getAdminClientProperties();
@@ -241,17 +211,6 @@ public class FuncEngine<T> {
             LOG.info("Creating topic {} with partitions={} and replicationFactor={}",
                     new Object[] { newTopicName, numPartitions, replicationFactor });
             NewTopic newTopic = new NewTopic(newTopicName, numPartitions, replicationFactor);
-            if (getTopicResolver().resolveTopicName(FuncEvent.Type.CORRELATION).equals(newTopicName)) {
-                Map<String, String> configs = new HashMap<>();
-                configs.put("cleanup.policy", "compact");
-                long defaultDuration = 3456000000L;
-                long retentionMs = Long.valueOf(this.getProperty(TOPIC_CORRELATION_RETENTION_MS, "" + defaultDuration));
-                configs.put("retention.ms", "" + retentionMs);
-                long deleteRetentionMs = Long
-                        .valueOf(this.getProperty(TOPIC_CORRELATION_DETELE_RETENTION_MS, "" + defaultDuration));
-                configs.put("delete.retention.ms", "" + deleteRetentionMs);
-                newTopic.configs(configs);
-            }
             return newTopic;
         }).collect(Collectors.toList());
         Properties properties = this.getAdminClientProperties();
@@ -420,19 +379,6 @@ public class FuncEngine<T> {
         return newFunctionEvent;
     }
 
-    public FuncEvent<T> correlate(ProcessCorrelation<T> correlation)
-            throws InterruptedException, ExecutionException {
-        FuncEvent<T> callbackMessage = FuncEvent.createWithDefaultValues();
-        callbackMessage.setCorrelationState(CorrelationState.CALLBACK_RECEIVED);
-        callbackMessage.setCorrelationId(correlation.getCorrelationId());
-        callbackMessage.setContext(correlation.getData());
-        String topicKeyWithProcessNameAndCorrelationId = this
-                .getProcessNameWithCorrelationId(correlation.getCorrelationId());
-        String callbackTopic = getTopicResolver().resolveTopicName(FuncEvent.Type.CALLBACK);
-        this.sendEventAndWait(callbackTopic, topicKeyWithProcessNameAndCorrelationId, callbackMessage);
-        return callbackMessage;
-    }
-
     public Properties getProperties() {
         return this.properties;
     }
@@ -452,14 +398,6 @@ public class FuncEngine<T> {
 
     public void setFuncContextSerDes(FuncContextSerDes<T> funcContextSerDes) {
         this.funcContextSerDes = funcContextSerDes;
-    }
-
-    public CorrelationMerger<T> getCorrelationMerger() {
-        return this.correlationMerger;
-    }
-
-    public void setCorrelationMerger(CorrelationMerger<T> correlationMerger) {
-        this.correlationMerger = correlationMerger;
     }
 
     public String getFunction(FuncEvent<T> event) {
