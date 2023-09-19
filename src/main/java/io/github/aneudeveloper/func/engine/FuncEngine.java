@@ -329,7 +329,7 @@ public class FuncEngine<T> implements Closeable {
         return processEventSerde;
     }
 
-    public FuncEvent<T> execute(FuncEvent<T> newFunctionEvent) throws Throwable {
+    public FuncEvent<T> execute(FuncEvent<T> newFunctionEvent) throws Exception {
         if (newFunctionEvent.getFunctionObj() == null) {
             throw new IllegalStateException(
                     "Missing function. Please provide which function should be called at start.");
@@ -428,7 +428,7 @@ public class FuncEngine<T> implements Closeable {
         Properties clientProperties = this.getProperties();
         Properties properties = new Properties();
         properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG,
-                clientProperties.getProperty("bootstrap.servers"));
+                clientProperties.getProperty(FuncEngine.KAFKA_BOOTSTRAP_SERVERS));
         return properties;
     }
 

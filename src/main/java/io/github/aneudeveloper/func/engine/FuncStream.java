@@ -102,7 +102,7 @@ public class FuncStream<T> {
     }
 
     private String toTopic(String key, FuncEvent<T> functionEvent, RecordContext recordContext) {
-        if(functionEvent.getNextRetryAt() != null){
+        if (functionEvent.getNextRetryAt() != null) {
             return this.processDefinition.getTopicResolver().getDelayTopic();
         }
         String topic = this.processDefinition.getTopicResolver().resolveTopicName(functionEvent.getType());
@@ -116,7 +116,7 @@ public class FuncStream<T> {
 
     private Properties getWorkflowStreamProperties() {
         Properties properties = new Properties();
-        properties.put("bootstrap.servers", this.processDefinition.getProperty("bootstrap.servers"));
+        properties.put("bootstrap.servers", this.processDefinition.getProperty(FuncEngine.KAFKA_BOOTSTRAP_SERVERS));
         properties.put("auto.offset.reset", "earliest");
         properties.put("default.key.serde", Serdes.String().getClass());
         properties.put("num.stream.threads",

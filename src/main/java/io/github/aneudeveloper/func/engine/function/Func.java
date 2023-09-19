@@ -10,6 +10,6 @@
 */
 package io.github.aneudeveloper.func.engine.function;
 
-public interface Func<T> extends IFunc {
+public interface Func<T> {
     public FuncEvent<T> work(FuncEvent<T> functionEvent);
 }

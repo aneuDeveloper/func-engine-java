@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import io.github.aneudeveloper.func.engine.function.Func;
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
 import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
-import io.github.aneudeveloper.func.engine.function.IFunc;
 
 public class FuncExecuter<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncExecuter.class);
@@ -34,7 +33,7 @@ public class FuncExecuter<T> {
         try {
             FuncEvent<T> nextFunctionEvent = this.executeMessage(functionEvent);
             return nextFunctionEvent;
-        } catch (Throwable e) {
+        } catch (Exception e) {
             LOGGER.error("Error while executing function. ProcessInstanceID=" + functionEvent.getProcessInstanceID()
                     + " functionId=" + functionEvent.getId(), e);
             FuncEvent<T> nextFunction = FuncEvent.newEvent();
@@ -59,7 +58,7 @@ public class FuncExecuter<T> {
 
     protected FuncEvent<T> executeMessage(FuncEvent<T> functionEvent)
             throws InterruptedException, ExecutionException {
-        IFunc function = this.getFunctionObj(functionEvent);
+        Func<T> function = this.getFunctionObj(functionEvent);
         if (functionEvent.getType() == FuncEvent.Type.TRANSIENT) {
             return this.executeTransientFunction(functionEvent, (Func<T>) function);
         }
@@ -68,12 +67,12 @@ public class FuncExecuter<T> {
         return this.executeStatefulFunction(functionEvent, (Func<T>) function);
     }
 
-    private IFunc getFunctionObj(FuncEvent<T> functionEvent) {
+    private Func<T> getFunctionObj(FuncEvent<T> functionEvent) {
         if (functionEvent.getFunctionObj() != null) {
             return functionEvent.getFunctionObj();
         }
         if (functionEvent.getFunction() != null) {
-            IFunc functionObj = this.functionWorkflow.getFuncSerDes().deserialize(functionEvent);
+            Func<T> functionObj = this.functionWorkflow.getFuncSerDes().deserialize(functionEvent);
             functionEvent.setFunctionObj(functionObj);
         }
         if (functionEvent.getFunctionObj() == null) {
@@ -117,11 +116,11 @@ public class FuncExecuter<T> {
                         Thread.sleep(millisToWait);
                     }
                 }
-                IFunc nextFunction = this.getFunctionObj(result);
-                result = this.executeTransientFunction(result, (Func<T>) nextFunction);
+                Func<T> nextFunction = this.getFunctionObj(result);
+                result = this.executeTransientFunction(result, nextFunction);
             }
             return result;
-        } catch (Throwable e) {
+        } catch (Exception e) {
             FuncEvent<T> nextFunction = FuncEvent.newEvent();
             nextFunction.setProcessName(functionEvent.getProcessName());
             nextFunction.setComingFromId(functionEvent.getId());

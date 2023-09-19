@@ -45,9 +45,9 @@ public class FuncEvent<T> {
     private int retryCount;
     private String sourceTopic;
 
-    private volatile IFunc functionObj;
+    private volatile Func<T> functionObj;
     private volatile T context;
-    private volatile Throwable error;
+    private volatile Exception error;
 
     protected FuncEvent(String version) {
         this.version = version;
@@ -122,11 +122,11 @@ public class FuncEvent<T> {
         this.function = function;
     }
 
-    public IFunc getFunctionObj() {
+    public Func<T> getFunctionObj() {
         return this.functionObj;
     }
 
-    public void setFunctionObj(IFunc functionObj) {
+    public void setFunctionObj(Func<T> functionObj) {
         this.functionObj = functionObj;
     }
 
@@ -162,11 +162,11 @@ public class FuncEvent<T> {
         this.context = context;
     }
 
-    public Throwable getError() {
+    public Exception getError() {
         return error;
     }
 
-    public void setError(Throwable error) {
+    public void setError(Exception error) {
         this.error = error;
     }
 
@@ -176,7 +176,7 @@ public class FuncEvent<T> {
         return functionEvent;
     }
 
-    public FuncEvent<T> next(IFunc nextFunction) {
+    public FuncEvent<T> next(Func<T> nextFunction) {
         FuncEvent<T> nextFunctionEvent = FuncEvent.newEvent();
         nextFunctionEvent.setProcessName(getProcessName());
         nextFunctionEvent.setComingFromId(getId());
@@ -187,7 +187,7 @@ public class FuncEvent<T> {
         return nextFunctionEvent;
     }
 
-    public FuncEvent<T> nextTransient(IFunc function) {
+    public FuncEvent<T> nextTransient(Func<T> function) {
         FuncEvent<T> nextFunction = FuncEvent.newEvent();
         nextFunction.setProcessName(getProcessName());
         nextFunction.setComingFromId(getId());

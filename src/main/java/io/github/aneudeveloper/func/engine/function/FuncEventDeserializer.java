@@ -25,6 +25,10 @@ public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
     public static final String VERSION = "1";
     private FuncContextSerDes<T> serDes;
 
+    public FuncEventDeserializer() {
+        super();
+    }
+
     public FuncEventDeserializer(FuncContextSerDes<T> serDes) {
         this.serDes = serDes;
     }
@@ -48,7 +52,9 @@ public class FuncEventDeserializer<T> implements Deserializer<FuncEvent<T>> {
             functionEvent.setError(exception);
             return functionEvent;
         }
-        functionEvent.setContext(serDes.deserialize(clientData));
+        if (serDes != null) {
+            functionEvent.setContext(serDes.deserialize(clientData));
+        }
         return functionEvent;
     }
 

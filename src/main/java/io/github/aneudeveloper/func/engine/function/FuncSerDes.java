@@ -11,7 +11,7 @@
 package io.github.aneudeveloper.func.engine.function;
 
 public interface FuncSerDes {
-    public IFunc deserialize(FuncEvent functionEvent);
+    public Func deserialize(FuncEvent functionEvent);
 
-    public String serialize(IFunc function);
+    public String serialize(Func function);
 }
