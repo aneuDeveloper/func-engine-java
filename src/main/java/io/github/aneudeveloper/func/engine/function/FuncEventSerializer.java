@@ -57,7 +57,9 @@ public class FuncEventSerializer<T> implements Serializer<FuncEvent<T>> {
         } else if (functionEvent.getFunctionObj() != null) {
             builder.append(",func=").append(funcSerDes.serialize(functionEvent.getFunctionObj()));
         }
-
+        if (functionEvent.getRetryCount() != null) {
+            builder.append(",retryCount=").append(functionEvent.getRetryCount());
+        }
         if (functionEvent.getNextRetryAt() != null) {
             builder.append(",nextRetryAt=").append(functionEvent.getNextRetryAt().toInstant().toEpochMilli());
         }

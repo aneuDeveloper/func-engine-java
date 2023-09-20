@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.github.aneudeveloper.func</groupId>
   <artifactId>func-engine</artifactId>
-  <version>1.1.1</version>
+  <version>1.1.2</version>
   <packaging>jar</packaging>
   <name>Func engine java</name>
   <description>Func engine for java, which creates kafka messages as workflow.</description>

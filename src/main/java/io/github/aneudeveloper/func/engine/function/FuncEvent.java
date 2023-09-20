@@ -42,7 +42,7 @@ public class FuncEvent<T> {
     private String function;
     private Type type;
     private ZonedDateTime nextRetryAt;
-    private int retryCount;
+    private Integer retryCount;
     private String sourceTopic;
 
     private volatile Func<T> functionObj;
@@ -106,11 +106,11 @@ public class FuncEvent<T> {
         this.nextRetryAt = nextRetryAt;
     }
 
-    public int getRetryCount() {
+    public Integer getRetryCount() {
         return this.retryCount;
     }
 
-    public void setRetryCount(int retryCount) {
+    public void setRetryCount(Integer retryCount) {
         this.retryCount = retryCount;
     }
 
