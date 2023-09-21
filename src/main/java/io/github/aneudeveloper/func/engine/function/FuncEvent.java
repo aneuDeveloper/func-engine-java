@@ -199,7 +199,11 @@ public class FuncEvent<T> {
     }
 
     public FuncEvent<T> retry(Retries... retriesArray) {
-        int executedRetries = getRetryCount();
+        Integer retryObject = getRetryCount();
+        int executedRetries = 0;
+        if (retryObject != null) {
+            executedRetries = retryObject;
+        }
         ZonedDateTime currentTime = ZonedDateTime.now();
 
         Retries choosenRetryUnitWithNumber = null;
@@ -230,7 +234,7 @@ public class FuncEvent<T> {
         retry.setComingFromId(getId());
         retry.setType(FuncEvent.Type.WORKFLOW);
         retry.setNextRetryAt(nextRetryAt);
-        retry.setRetryCount(getRetryCount() + 1);
+        retry.setRetryCount(executedRetries + 1);
         retry.setFunction(getFunction());
         retry.setProcessInstanceID(getProcessInstanceID());
         retry.setContext(getContext());
