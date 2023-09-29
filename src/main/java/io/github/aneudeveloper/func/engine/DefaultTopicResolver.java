@@ -27,14 +27,11 @@ public class DefaultTopicResolver implements TopicResolver {
         switch (functionType) {
             case TRANSIENT:
                 return "TRANSIENT";
+            case DELAY:
+                return "DELAY";
             default:
                 return this.prefix + FuncEvent.Type.WORKFLOW.name();
         }
 
-    }
-
-    @Override
-    public String getDelayTopic() {
-        return "DELAY";
     }
 }

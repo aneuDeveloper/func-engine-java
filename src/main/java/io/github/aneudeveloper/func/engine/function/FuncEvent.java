@@ -18,7 +18,7 @@ import io.github.aneudeveloper.func.engine.Retries;
 
 public class FuncEvent<T> {
     public static enum Type {
-        END, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR;
+        END, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR, DELAY;
     }
 
     public static final String VERSION = "v";
@@ -232,7 +232,7 @@ public class FuncEvent<T> {
         FuncEvent<T> retry = FuncEvent.newEvent();
         retry.setProcessName(getProcessName());
         retry.setComingFromId(getId());
-        retry.setType(FuncEvent.Type.WORKFLOW);
+        retry.setType(FuncEvent.Type.DELAY);
         retry.setNextRetryAt(nextRetryAt);
         retry.setRetryCount(executedRetries + 1);
         retry.setFunction(getFunction());
