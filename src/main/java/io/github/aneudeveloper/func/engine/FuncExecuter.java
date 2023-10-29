@@ -29,9 +29,13 @@ public class FuncExecuter<T> {
         this.topicResolver = this.functionWorkflow.getTopicResolver();
     }
 
-    public FuncEvent<T> executeMessageAndDiscoverNextStep(FuncEvent<T> functionEvent) {
+    protected FuncEvent<T> executeMessageAndDiscoverNextStep(FuncEvent<T> functionEvent) {
         try {
             FuncEvent<T> nextFunctionEvent = this.executeMessage(functionEvent);
+            if (nextFunctionEvent == null) {
+                FuncEvent<T> endEvent = createEndEvent(functionEvent);
+                return endEvent;
+            }
             return nextFunctionEvent;
         } catch (Exception e) {
             LOGGER.error("Error while executing function. ProcessInstanceID=" + functionEvent.getProcessInstanceID()
@@ -56,9 +60,19 @@ public class FuncExecuter<T> {
         return endEvent;
     }
 
-    protected FuncEvent<T> executeMessage(FuncEvent<T> functionEvent)
+    public FuncEvent<T> executeMessage(FuncEvent<T> functionEvent)
             throws InterruptedException, ExecutionException {
+        if (functionEvent == null) {
+            throw new IllegalStateException(
+                    "functionEvent must not be null");
+        }
+        if (functionEvent.getType() != Type.WORKFLOW && functionEvent.getType() != Type.TRANSIENT) {
+            throw new IllegalStateException(
+                    "Invalid event was passed. Only type=WORKFLOW or type=TRANSIENT can be executed. Type was="
+                            + functionEvent.getType());
+        }
         Func<T> function = this.getFunctionObj(functionEvent);
+
         if (functionEvent.getType() == FuncEvent.Type.TRANSIENT) {
             return this.executeTransientFunction(functionEvent, (Func<T>) function);
         }
@@ -85,9 +99,6 @@ public class FuncExecuter<T> {
 
     private FuncEvent<T> executeStatefulFunction(FuncEvent<T> functionEvent, Func<T> function) {
         FuncEvent<T> result = function.work(functionEvent);
-        if (result == null) {
-            return this.createEndEvent(functionEvent);
-        }
         return result;
     }
 
@@ -109,13 +120,17 @@ public class FuncExecuter<T> {
                 this.functionWorkflow.sendEvent(destTopic, null, endEvent);
                 return endEvent;
             }
-            if (result.getType() == Type.TRANSIENT) {
-                if (result.getNextRetryAt() != null) {
-                    long millisToWait = (result.getNextRetryAt().toEpochSecond() * 1000) - System.currentTimeMillis();
-                    if (millisToWait > 0) {
-                        Thread.sleep(millisToWait);
-                    }
+            if (result.getType() == Type.DELAY) {
+                long millisToWait = (result.getNextRetryAt().toEpochSecond() * 1000) - System.currentTimeMillis();
+                if (millisToWait > 0) {
+                    this.functionWorkflow.sendEvent(destTopic, null, result);
+                    Thread.sleep(millisToWait);
                 }
+                Func<T> nextFunction = this.getFunctionObj(result);
+                FuncEvent<T> nextTransient = result.nextTransient(nextFunction);
+                result = this.executeTransientFunction(nextTransient, nextFunction);
+            }
+            if (result.getType() == Type.TRANSIENT) {
                 Func<T> nextFunction = this.getFunctionObj(result);
                 result = this.executeTransientFunction(result, nextFunction);
             }

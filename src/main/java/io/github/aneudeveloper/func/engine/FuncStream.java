@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
 import io.github.aneudeveloper.func.engine.function.FuncEventTransformer;
+import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
 
 public class FuncStream<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncStream.class);
@@ -52,9 +53,8 @@ public class FuncStream<T> {
 
         stream.filter(this::shouldExecuteFuntion) //
                 .mapValues(this.processEventExecuter::executeMessageAndDiscoverNextStep) //
-                // .filter(null) // filter transient messages
                 .transform(() -> this.createTransformer(), new String[0]) //
-                .selectKey((key, functionEvent) -> this.selectTopicKey(key, functionEvent))
+                .selectKey((key, functionEvent) -> this.selectTopicKey(key, functionEvent))//
                 .to((key, functionEvent, recordContext) -> this.toTopic(key, functionEvent, recordContext),
                         Produced.with(Serdes.String(), processEventSerde));
 
@@ -86,7 +86,7 @@ public class FuncStream<T> {
                     LOGGER.trace("Message received: {}", new String(FuncStream.this.processDefinition
                             .getSerde().serializer().serialize(null, functionEvent)));
                 }
-                if (functionEvent.getNextRetryAt() != null) {
+                if (functionEvent.getType() != null && functionEvent.getType() == FuncEvent.Type.DELAY) {
                     functionEvent.setSourceTopic(this.context.topic());
                 }
                 return new KeyValue<String, FuncEvent<T>>(key, functionEvent);
@@ -95,7 +95,7 @@ public class FuncStream<T> {
     }
 
     private String selectTopicKey(String key, FuncEvent<T> functionEvent) {
-        if (functionEvent.getNextRetryAt() != null) {
+        if (functionEvent.getType() != null && functionEvent.getType() == Type.DELAY) {
             return functionEvent.getId();
         }
         return key;

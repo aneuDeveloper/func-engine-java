@@ -216,9 +216,10 @@ public class FuncEvent<T> {
         } else {
             int maxPossibleRetries = 0;
             for (Retries retries : retriesArray) {
-                if ((maxPossibleRetries += retries.getRetryTimes()) <= executedRetries
-                        || maxPossibleRetries <= executedRetries)
+                maxPossibleRetries += retries.getRetryTimes();
+                if (maxPossibleRetries <= executedRetries) {
                     continue;
+                }
                 choosenRetryUnitWithNumber = retries;
                 break;
             }
