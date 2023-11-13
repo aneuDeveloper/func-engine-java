@@ -11,14 +11,12 @@
 package io.github.aneudeveloper.func.engine;
 
 import java.util.Collection;
-import java.util.Properties;
 
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
@@ -27,8 +25,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
-import io.github.aneudeveloper.func.engine.function.FuncEventTransformer;
 import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
+import io.github.aneudeveloper.func.engine.function.FuncEventTransformer;
 
 public class FuncStream<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncStream.class);
@@ -58,8 +56,7 @@ public class FuncStream<T> {
                 .to((key, functionEvent, recordContext) -> this.toTopic(key, functionEvent, recordContext),
                         Produced.with(Serdes.String(), processEventSerde));
 
-        Properties properties = this.prepareProperties(topics.iterator().next());
-        this.streams = new KafkaStreams(streamsBuilder.build(), properties);
+        this.streams = new KafkaStreams(streamsBuilder.build(), processDefinition.getFuncStreamProperties());
         this.streams.start();
     }
 
@@ -67,14 +64,6 @@ public class FuncStream<T> {
         boolean shouldExecute = (value.getType() == null || value.getType() == FuncEvent.Type.WORKFLOW)
                 && value.getFunction() != null && !value.getFunction().isBlank();
         return shouldExecute;
-    }
-
-    private Properties prepareProperties(String topicName) {
-        Properties properties = this.getWorkflowStreamProperties();
-        String applicationNamePrefix = this.processDefinition.getProperty(FuncEngine.WORKFLOW_STREAM_PREFIX,
-                this.processDefinition.getProcessName());
-        properties.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationNamePrefix + "-" + topicName);
-        return properties;
     }
 
     private FuncEventTransformer<T> createTransformer() {
@@ -109,19 +98,5 @@ public class FuncStream<T> {
     public void close() {
         LOGGER.info("Shutdown workflow stream");
         this.streams.close();
-    }
-
-    private Properties getWorkflowStreamProperties() {
-        Properties properties = new Properties();
-        properties.put("bootstrap.servers", this.processDefinition.getProperty(FuncEngine.KAFKA_BOOTSTRAP_SERVERS));
-        properties.put("auto.offset.reset", "earliest");
-        properties.put("default.key.serde", Serdes.String().getClass());
-        properties.put("num.stream.threads",
-                this.processDefinition.getProperty("steps.num.stream.threads.config", "1"));
-        properties.put("default.deserialization.exception.handler",
-                this.processDefinition.getProperty("default.deserialization.exception.handler",
-                        "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler"));
-        properties.put("processing.guarantee", "exactly_once_v2");
-        return properties;
     }
 }

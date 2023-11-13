@@ -33,6 +33,7 @@ import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.streams.StreamsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,13 +47,6 @@ import io.github.aneudeveloper.func.engine.function.FuncSerDes;
 
 public class FuncEngine<T> implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(FuncEngine.class);
-    public static final String PROCESS_NAME = "process.name";
-    public static final String KAFKA_BOOTSTRAP_SERVERS = "bootstrap.servers";
-    public static final String WORKFLOW_STREAM_PREFIX = "workflow.stream.prefix";
-    public static final String TOPIC_DEFAULT_NUM_PARTITIONS = "topic.default.num.partitions";
-    public static final String TOPIC_DEFAULT_REPLICATION_FACTOR = "topic.default.replication.factor";
-    public static final String STEPS_NUM_STREAM_THREADS_CONFIG = "steps.num.stream.threads.config";
-    public static final String DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG = "default.deserialization.exception.handler";
 
     private KafkaProducer<String, byte[]> kafkaProducer;
     private String processName;
@@ -64,49 +58,36 @@ public class FuncEngine<T> implements Closeable {
     private FuncExecuter<T> processEventExecuter;
     private FuncEventSerializer<T> funcEventSerializer;
     private SendEventExceptionHandler sendEventExceptionHandler;
+    private Properties funcStreamProperties;
+    private Properties producerProperties;
+    private String bootstrapServers;
+    private int newTopicNumPartitions = 1;
+    private short newTopicReplicationRactor = 1;
 
-    public FuncEngine(Properties properties) {
-        if (properties == null) {
-            throw new IllegalStateException("Please provide properties");
+    public FuncEngine(String processName, String bootstrapServers) {
+        if (processName == null) {
+            throw new IllegalStateException("Please provide processName");
         }
-        this.properties = properties;
-        this.processName = this.getProcessName(properties);
+        if (bootstrapServers == null) {
+            throw new IllegalStateException("Please provide bootstrapServers");
+        }
+        this.bootstrapServers = bootstrapServers;
+        this.processName = processName;
         this.processEventExecuter = new FuncExecuter<T>(this);
-    }
-
-    private String getProcessName(Properties properties) {
-        this.processName = properties.getProperty(PROCESS_NAME);
-        if (this.processName == null || this.processName.trim().isBlank()) {
-            throw new IllegalStateException("Please define following property process.name in properties");
-        }
-        return this.processName;
     }
 
     public void start() {
         if (funcStream != null) {
             return;
         }
-        Properties producerProperties = new Properties();
-        producerProperties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, getProperty(KAFKA_BOOTSTRAP_SERVERS));
-        producerProperties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        producerProperties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
-        producerProperties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
-        producerProperties.setProperty(ProducerConfig.RETRIES_CONFIG, "10");
-        producerProperties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
-        producerProperties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
-        producerProperties.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
-        producerProperties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
-        producerProperties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32768));
-        producerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
-
-        String bootstrapServer = producerProperties.getProperty(KAFKA_BOOTSTRAP_SERVERS);
-        LOG.info("Checking if Kafka is ready. For bootstrapserver={}", bootstrapServer);
+        LOG.info("Checking if Kafka is ready. For bootstrapserver={}", bootstrapServers);
+        producerProperties = getProducerProperties();
         for (int i = 0; i < 150; ++i) {
             if (this.isKafkaReady(producerProperties)) {
                 LOG.info("Kafka is ready. Continue ...");
                 break;
             }
-            LOG.info("Kafka is not ready yet. Waiting 4100 ms. Bootstrapserver={}", bootstrapServer);
+            LOG.info("Kafka is not ready yet. Waiting 4100 ms. Bootstrapserver={}", bootstrapServers);
             try {
                 Thread.sleep(4100L);
                 continue;
@@ -125,6 +106,25 @@ public class FuncEngine<T> implements Closeable {
         funcStream.start(List.of(workflowTopic));
     }
 
+    public Properties getProducerProperties() {
+        if (this.producerProperties == null) {
+            this.producerProperties = new Properties();
+            producerProperties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+            producerProperties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                    StringSerializer.class.getName());
+            producerProperties.setProperty(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "true");
+            producerProperties.setProperty(ProducerConfig.ACKS_CONFIG, "all");
+            producerProperties.setProperty(ProducerConfig.RETRIES_CONFIG, "10");
+            producerProperties.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "5");
+            producerProperties.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+            producerProperties.setProperty(ProducerConfig.MAX_BLOCK_MS_CONFIG, "60000");
+            producerProperties.setProperty(ProducerConfig.LINGER_MS_CONFIG, "20");
+            producerProperties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, Integer.toString(32768));
+            producerProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        }
+        return producerProperties;
+    }
+
     public void createMissingTopics() {
         Set<String> missingTopics = this.getMissingTopics();
         if (missingTopics != null && !missingTopics.isEmpty()) {
@@ -137,7 +137,8 @@ public class FuncEngine<T> implements Closeable {
 
     private boolean isKafkaReady(Properties aProperties) {
         Properties properties = new Properties();
-        properties.put(KAFKA_BOOTSTRAP_SERVERS, aProperties.get(KAFKA_BOOTSTRAP_SERVERS));
+        properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG,
+                aProperties.get(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG));
         properties.put("connections.max.idle.ms", 4000);
         properties.put("request.timeout.ms", 4000);
         AdminClient client = null;
@@ -204,13 +205,9 @@ public class FuncEngine<T> implements Closeable {
         }
         LOG.info("Try to create following topics: {}", aTopicsToCreate.toString());
         List<NewTopic> topicsToCreate = aTopicsToCreate.parallelStream().map(newTopicName -> {
-            int numPartitions = Integer.valueOf(
-                    this.getPropertyOverridedForTopic(newTopicName, TOPIC_DEFAULT_NUM_PARTITIONS, "1"));
-            short replicationFactor = Short.valueOf(
-                    this.getPropertyOverridedForTopic(newTopicName, TOPIC_DEFAULT_REPLICATION_FACTOR, "1"));
             LOG.info("Creating topic {} with partitions={} and replicationFactor={}",
-                    new Object[] { newTopicName, numPartitions, replicationFactor });
-            NewTopic newTopic = new NewTopic(newTopicName, numPartitions, replicationFactor);
+                    new Object[] { newTopicName, newTopicNumPartitions, newTopicReplicationRactor });
+            NewTopic newTopic = new NewTopic(newTopicName, this.newTopicNumPartitions, newTopicReplicationRactor);
             return newTopic;
         }).collect(Collectors.toList());
         Properties properties = this.getAdminClientProperties();
@@ -226,14 +223,6 @@ public class FuncEngine<T> implements Closeable {
                 });
             }
         }
-    }
-
-    private String getPropertyOverridedForTopic(String topicName, String key, String defaultValue) {
-        Object topicSpecificProperty = this.properties.get(topicName + "_" + key);
-        if (topicSpecificProperty != null) {
-            return String.valueOf(topicSpecificProperty);
-        }
-        return this.getProperty(key, defaultValue);
     }
 
     public void sendEvent(String destinationTopic, String key, FuncEvent<T> functionEvent) {
@@ -428,7 +417,7 @@ public class FuncEngine<T> implements Closeable {
         Properties clientProperties = this.getProperties();
         Properties properties = new Properties();
         properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG,
-                clientProperties.getProperty(FuncEngine.KAFKA_BOOTSTRAP_SERVERS));
+                clientProperties.getProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG));
         return properties;
     }
 
@@ -449,5 +438,44 @@ public class FuncEngine<T> implements Closeable {
 
     public void setSendEventExceptionHandler(SendEventExceptionHandler sendEventExceptionHandler) {
         this.sendEventExceptionHandler = sendEventExceptionHandler;
+    }
+
+    public Properties getFuncStreamProperties() {
+        if (funcStreamProperties == null) {
+            Properties properties = new Properties();
+            properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+            properties.put("auto.offset.reset", "earliest");
+            properties.put("default.key.serde", Serdes.String().getClass());
+            properties.put("num.stream.threads", "1");
+            properties.put("default.deserialization.exception.handler",
+                    "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
+
+            properties.put("processing.guarantee", "exactly_once_v2");
+            properties.put("transaction.timeout.ms", "900000");
+            properties.put("max.poll.records", "5");
+            properties.put(StreamsConfig.APPLICATION_ID_CONFIG, processName + "-FuncStream");
+            funcStreamProperties = properties;
+        }
+        return this.funcStreamProperties;
+    }
+
+    public void setFuncStreamProperties(Properties funcStreamProperties) {
+        this.funcStreamProperties = funcStreamProperties;
+    }
+
+    public int getNewTopicNumPartitions() {
+        return newTopicNumPartitions;
+    }
+
+    public void setNewTopicNumPartitions(int newTopicNumPartitions) {
+        this.newTopicNumPartitions = newTopicNumPartitions;
+    }
+
+    public int getNewTopicReplicationRactor() {
+        return newTopicReplicationRactor;
+    }
+
+    public void setNewTopicReplicationRactor(short newTopicReplicationRactor) {
+        this.newTopicReplicationRactor = newTopicReplicationRactor;
     }
 }
