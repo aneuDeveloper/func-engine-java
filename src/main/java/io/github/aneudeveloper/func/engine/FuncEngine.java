@@ -77,6 +77,15 @@ public class FuncEngine<T> implements Closeable {
     }
 
     public void start() {
+        createProducer();
+        startFuncStream();
+    }
+
+    public void createProducer() {
+        this.kafkaProducer = new KafkaProducer<>(producerProperties);
+    }
+
+    public void startFuncStream() {
         if (funcStream != null) {
             return;
         }
@@ -96,8 +105,6 @@ public class FuncEngine<T> implements Closeable {
             }
         }
         LOG.debug("Start workflow={}", this.getProcessName());
-
-        this.kafkaProducer = new KafkaProducer<>(producerProperties);
 
         String workflowTopic = getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW);
         LOG.info("Observe workflow topic: {}", workflowTopic);
