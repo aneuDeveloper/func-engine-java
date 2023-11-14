@@ -51,7 +51,6 @@ public class FuncEngine<T> implements Closeable {
     private KafkaProducer<String, byte[]> kafkaProducer;
     private String processName;
     private FuncStream<T> funcStream;
-    private Properties properties;
     private FuncContextSerDes<T> funcContextSerDes;
     private FuncSerDes funcSerDes;
     private TopicResolver topicResolver;
@@ -82,7 +81,7 @@ public class FuncEngine<T> implements Closeable {
     }
 
     public void createProducer() {
-        this.kafkaProducer = new KafkaProducer<>(producerProperties);
+        this.kafkaProducer = new KafkaProducer<>(getProducerProperties());
     }
 
     public void startFuncStream() {
@@ -375,19 +374,6 @@ public class FuncEngine<T> implements Closeable {
         return newFunctionEvent;
     }
 
-    public Properties getProperties() {
-        return this.properties;
-    }
-
-    public String getProperty(String key) {
-        return this.properties.getProperty(key);
-    }
-
-    public String getProperty(String key, String defaultValue) {
-        String property = String.valueOf(this.properties.getOrDefault(key, defaultValue));
-        return property;
-    }
-
     public FuncContextSerDes<T> getFuncContextSerDes() {
         return this.funcContextSerDes;
     }
@@ -421,10 +407,8 @@ public class FuncEngine<T> implements Closeable {
     }
 
     private Properties getAdminClientProperties() {
-        Properties clientProperties = this.getProperties();
         Properties properties = new Properties();
-        properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG,
-                clientProperties.getProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG));
+        properties.setProperty(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         return properties;
     }
 
