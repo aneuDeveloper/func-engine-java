@@ -29,6 +29,9 @@ jobs:
           printf "%s" "$GPG_PRIVATE_KEY" | tr -d '\r' | gpg --batch --import
           # optionally trust the key or configure pinentry:
           echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
+      
+      - name: Check GPG keys after import
+        run: gpg --list-secret-keys --keyid-format LONG
 
       - name: Deploy to Central Portal
         env:
