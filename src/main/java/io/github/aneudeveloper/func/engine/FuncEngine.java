@@ -34,6 +34,7 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +74,12 @@ public class FuncEngine<T> implements Closeable {
         this.bootstrapServers = bootstrapServers;
         this.processName = processName;
         this.processEventExecuter = new FuncExecuter<T>(this);
+    }
+
+    public void setUncaughtExceptionHandler(StreamsUncaughtExceptionHandler uncaughtExceptionHandler) {
+        if(funcStream != null){
+            this.funcStream.setUncaughtExceptionHandler(uncaughtExceptionHandler);
+        }
     }
 
     public void start() {
