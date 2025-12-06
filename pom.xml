@@ -125,22 +125,18 @@
 					</execution>
 				</executions>
 			</plugin>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.sonatype.central</groupId>
-						<artifactId>central-publishing-maven-plugin</artifactId>
-						<version>0.9.0</version>
-						<extensions>true</extensions>
-						<configuration>
-							<publishingServerId>central</publishingServerId>
-							<!-- optional for full automation -->
-							<autoPublish>true</autoPublish>
-							<waitUntil>published</waitUntil>
-						</configuration>
-					</plugin>
-				</plugins>
-			</build>
+			<plugin>
+				<groupId>org.sonatype.central</groupId>
+				<artifactId>central-publishing-maven-plugin</artifactId>
+				<version>0.9.0</version>
+				<extensions>true</extensions>
+				<configuration>
+					<publishingServerId>central</publishingServerId>
+					<!-- optional for full automation -->
+					<autoPublish>true</autoPublish>
+					<waitUntil>published</waitUntil>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 	<distributionManagement>
