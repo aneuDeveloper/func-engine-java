@@ -22,14 +22,16 @@ jobs:
           server-password: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
         
       - name: Import GPG key
+        run: |
+          mkdir -p ~/.gnupg
+          printf "%s" "${{ secrets.MAVEN_GPG_PRIVATE_KEY }}" | gpg --batch --import
+          
+      - name: Debug GPG key length
         env:
           GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: |
-          printf "%s" "$GPG_PRIVATE_KEY" | tr -d '\r' | gpg --batch --import
-          # optionally trust the key or configure pinentry:
-          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
-      
+          echo "Key length = ${#GPG_PRIVATE_KEY}"
+          
       - name: Check GPG keys after import
         run: gpg --list-secret-keys --keyid-format LONG
 
