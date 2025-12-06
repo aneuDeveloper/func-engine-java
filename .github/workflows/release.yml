@@ -33,4 +33,4 @@ jobs:
       - name: Deploy to Central Portal
         env:
           GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: mvn clean deploy -Dgpg.passphrase="$MAVEN_GPG_PASSPHRASE" --batch-mode
+        run: mvn clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE" --batch-mode
