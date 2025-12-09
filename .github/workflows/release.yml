@@ -49,6 +49,8 @@ jobs:
       - name: Check GPG keys after import
         run: gpg --list-secret-keys --keyid-format LONG
 
+      - name: check Maven
+        run: curl -u "${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}:${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}" https://central.sonatype.com/api/v1/publisher/namespaces
       # - name: Deploy to Central Portal
       #   env:
       #     GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
@@ -57,9 +59,7 @@ jobs:
       #   run: mvn -B -e clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE"
 
       - name: Publish package
-        run: |
-          echo "Using MAVEN_USERNAME=$MY_TEST_PROP"
-          mvn --batch-mode deploy -DskipTests
+        run: mvn --batch-mode deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
           MY_TEST_PROP: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
