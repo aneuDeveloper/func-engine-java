@@ -58,7 +58,7 @@ jobs:
 
       - name: Publish package
         run: |
-          echo "Using MAVEN_USERNAME=$MAVEN_USERNAME"
+          echo "Using MAVEN_USERNAME=$MAVEN_USERNAME ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}"
           mvn --batch-mode deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
