@@ -16,8 +16,6 @@ jobs:
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
-          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -25,8 +23,6 @@ jobs:
           server-id: 'central'
           server-username: ${env.CENTRAL_USERNAME}
           server-password: ${env.CENTRAL_PASSWORD}
-          gpg-private-key: ${env.MAVEN_GPG_PRIVATE_KEY}
-          gpg-passphrase: ${env.MAVEN_GPG_PASSPHRASE}
         
       - name: Import GPG key
         run: |
