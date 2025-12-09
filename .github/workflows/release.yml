@@ -58,9 +58,10 @@ jobs:
 
       - name: Publish package
         run: |
-          echo "Using MAVEN_USERNAME=$MAVEN_USERNAME ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}"
+          echo "Using MAVEN_USERNAME=$MY_TEST_PROP"
           mvn --batch-mode deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          MY_TEST_PROP: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
