@@ -12,17 +12,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java and Maven settings
-        env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+      # - name: Set up Java and Maven settings
+      #   env:
+      #     CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+      #     CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+      #   uses: actions/setup-java@v4
+      #   with:
+      #     distribution: 'temurin'
+      #     java-version: '17'
+      #     server-id: 'central'
+      #     server-username: ${env.CENTRAL_USERNAME}
+      #     server-password: ${env.CENTRAL_PASSWORD}
+      
+      - name: Set up Maven Central Repository
         uses: actions/setup-java@v4
         with:
+          java-version: '21'
           distribution: 'temurin'
-          java-version: '17'
-          server-id: 'central'
-          server-username: ${env.CENTRAL_USERNAME}
-          server-password: ${env.CENTRAL_PASSWORD}
+          server-id: central
+          server-username: CENTRAL_SONATYPE_TOKEN_USERNAME
+          server-password: CENTRAL_SONATYPE_TOKEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
         
       - name: Import GPG key
         run: |
@@ -38,10 +49,16 @@ jobs:
       - name: Check GPG keys after import
         run: gpg --list-secret-keys --keyid-format LONG
 
-      - name: Deploy to Central Portal
+      # - name: Deploy to Central Portal
+      #   env:
+      #     GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+      #     CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+      #     CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+      #   run: mvn -B -e clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE"
+
+      - name: Publish package
+        run: mvn --batch-mode deploy -DskipTests
         env:
-          GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
-        # run: mvn -B -e clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE"
-        run: mvn -B -e clean deploy -Drepo.id=central -Drepo.login=$CENTRAL_USERNAME -Drepo.pwd=$CENTRAL_PASSWORD -Dgpg.passphrase="$GPG_PASSPHRASE"
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
