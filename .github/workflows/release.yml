@@ -57,7 +57,9 @@ jobs:
       #   run: mvn -B -e clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE"
 
       - name: Publish package
-        run: mvn --batch-mode deploy -DskipTests
+        run: |
+          echo "Using MAVEN_USERNAME=$MAVEN_USERNAME"
+          mvn --batch-mode deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
