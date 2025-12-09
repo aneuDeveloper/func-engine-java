@@ -12,17 +12,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java and Maven settings
-        env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          server-id: 'central'
-          server-username: ${env.CENTRAL_USERNAME}
-          server-password: ${env.CENTRAL_PASSWORD}
+      # - name: Set up Java and Maven settings
+      #   env:
+      #     CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+      #     CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+      #   uses: actions/setup-java@v4
+      #   with:
+      #     distribution: 'temurin'
+      #     java-version: '17'
+      #     server-id: 'central'
+      #     server-username: ${env.CENTRAL_USERNAME}
+      #     server-password: ${env.CENTRAL_PASSWORD}
         
       - name: Import GPG key
         run: |
@@ -41,4 +41,7 @@ jobs:
       - name: Deploy to Central Portal
         env:
           GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: mvn -B -e clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE"
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+        # run: mvn -B -e clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE"
+        run: mvn -B -e clean deploy -Drepo.id=central -Drepo.login=$CENTRAL_USERNAME -Drepo.pwd=$CENTRAL_PASSWORD -Dgpg.passphrase="$GPG_PASSPHRASE"
