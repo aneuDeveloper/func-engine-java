@@ -18,7 +18,7 @@ jobs:
           printf "%s" "${{ secrets.MAVEN_GPG_PRIVATE_KEY }}" | gpg --batch --import
           
       - name: Deploy to maven central
-        run: mvn -B -e -s .github/maven/settings.xml clean deploy -Dgpg.passphrase="$GPG_PASSPHRASE"
+        run: mvn -B -e -s .github/maven/settings.xml clean deploy -Prelease -Dgpg.passphrase="$GPG_PASSPHRASE"
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}

@@ -11,10 +11,6 @@
 package io.github.aneudeveloper.func.engine.function;
 
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.UUID;
-
-import io.github.aneudeveloper.func.engine.Retries;
 
 public class FuncEvent<T> {
     public static enum Type {
@@ -41,13 +37,10 @@ public class FuncEvent<T> {
     private String processInstanceID;
     private String function;
     private Type type;
-    private ZonedDateTime nextRetryAt;
+    private ZonedDateTime executeAt;
     private Integer retryCount;
     private String sourceTopic;
-
-    private volatile Func<T> functionObj;
-    private volatile T context;
-    private volatile Exception error;
+    private T context;
 
     protected FuncEvent(String version) {
         this.version = version;
@@ -78,167 +71,90 @@ public class FuncEvent<T> {
         return this.id;
     }
 
-    public void setId(String id) {
+    public FuncEvent<T> setId(String id) {
         this.id = id;
+        return this;
     }
 
     public String getComingFromId() {
         return this.comingFromId;
     }
 
-    public void setComingFromId(String comingFromId) {
+    public FuncEvent<T> setComingFromId(String comingFromId) {
         this.comingFromId = comingFromId;
+        return this;
     }
 
     public String getProcessInstanceID() {
         return this.processInstanceID;
     }
 
-    public void setProcessInstanceID(String processInstanceID) {
+    public FuncEvent<T> setProcessInstanceID(String processInstanceID) {
         this.processInstanceID = processInstanceID;
+        return this;
     }
 
-    public ZonedDateTime getNextRetryAt() {
-        return this.nextRetryAt;
+    public ZonedDateTime getExecuteAt() {
+        return this.executeAt;
     }
 
-    public void setNextRetryAt(ZonedDateTime nextRetryAt) {
-        this.nextRetryAt = nextRetryAt;
+    public FuncEvent<T> setExecuteAt(ZonedDateTime nextRetryAt) {
+        this.executeAt = nextRetryAt;
+        return this;
     }
 
     public Integer getRetryCount() {
         return this.retryCount;
     }
 
-    public void setRetryCount(Integer retryCount) {
+    public FuncEvent<T> setRetryCount(Integer retryCount) {
         this.retryCount = retryCount;
+        return this;
     }
 
     public String getFunction() {
         return this.function;
     }
 
-    public void setFunction(String function) {
+    public FuncEvent<T> setFunction(String function) {
         this.function = function;
-    }
-
-    public Func<T> getFunctionObj() {
-        return this.functionObj;
-    }
-
-    public void setFunctionObj(Func<T> functionObj) {
-        this.functionObj = functionObj;
+        return this;
     }
 
     public ZonedDateTime getTimeStamp() {
         return this.timeStamp;
     }
 
-    public void setTimeStamp(ZonedDateTime timeStamp) {
+    public FuncEvent<T> setTimeStamp(ZonedDateTime timeStamp) {
         this.timeStamp = timeStamp;
+        return this;
     }
 
     public Type getType() {
         return this.type;
     }
 
-    public void setType(Type type) {
+    public FuncEvent<T> setType(Type type) {
         this.type = type;
+        return this;
     }
 
     public String getSourceTopic() {
         return this.sourceTopic;
     }
 
-    public void setSourceTopic(String sourceTopic) {
+    public FuncEvent<T> setSourceTopic(String sourceTopic) {
         this.sourceTopic = sourceTopic;
+        return this;
     }
 
     public T getContext() {
         return context;
     }
 
-    public void setContext(T context) {
+    public FuncEvent<T> setContext(T context) {
         this.context = context;
+        return this;
     }
 
-    public Exception getError() {
-        return error;
-    }
-
-    public void setError(Exception error) {
-        this.error = error;
-    }
-
-    public static final <T> FuncEvent<T> newEvent() {
-        FuncEvent<T> functionEvent = new FuncEvent<>(FuncEventDeserializer.VERSION, UUID.randomUUID().toString());
-        functionEvent.setTimeStamp(ZonedDateTime.now());
-        return functionEvent;
-    }
-
-    public FuncEvent<T> next(Func<T> nextFunction) {
-        FuncEvent<T> nextFunctionEvent = FuncEvent.newEvent();
-        nextFunctionEvent.setProcessName(getProcessName());
-        nextFunctionEvent.setComingFromId(getId());
-        nextFunctionEvent.setProcessInstanceID(getProcessInstanceID());
-        nextFunctionEvent.setType(FuncEvent.Type.WORKFLOW);
-        nextFunctionEvent.setContext(getContext());
-        nextFunctionEvent.setFunctionObj(nextFunction);
-        return nextFunctionEvent;
-    }
-
-    public FuncEvent<T> nextTransient(Func<T> function) {
-        FuncEvent<T> nextFunction = FuncEvent.newEvent();
-        nextFunction.setProcessName(getProcessName());
-        nextFunction.setComingFromId(getId());
-        nextFunction.setProcessInstanceID(getProcessInstanceID());
-        nextFunction.setType(FuncEvent.Type.TRANSIENT);
-        nextFunction.setFunctionObj(function);
-        nextFunction.setContext(getContext());
-        return nextFunction;
-    }
-
-    public FuncEvent<T> retry(Retries... retriesArray) {
-        Integer retryObject = getRetryCount();
-        int executedRetries = 0;
-        if (retryObject != null) {
-            executedRetries = retryObject;
-        }
-        ZonedDateTime currentTime = ZonedDateTime.now();
-
-        Retries choosenRetryUnitWithNumber = null;
-        if (retriesArray == null) {
-            if (3 <= executedRetries) {
-                // no retries anymore
-                return null;
-            }
-            choosenRetryUnitWithNumber = Retries.build().retryTimes(3).in(5, ChronoUnit.MINUTES);
-        } else {
-            int maxPossibleRetries = 0;
-            for (Retries retries : retriesArray) {
-                maxPossibleRetries += retries.getRetryTimes();
-                if (maxPossibleRetries <= executedRetries) {
-                    continue;
-                }
-                choosenRetryUnitWithNumber = retries;
-                break;
-            }
-        }
-        if (choosenRetryUnitWithNumber == null) {
-            return null;
-        }
-        long jdf = choosenRetryUnitWithNumber.getTime();
-        ZonedDateTime nextRetryAt = currentTime.plus(jdf, choosenRetryUnitWithNumber.getTimeUnit());
-
-        FuncEvent<T> retry = FuncEvent.newEvent();
-        retry.setProcessName(getProcessName());
-        retry.setComingFromId(getId());
-        retry.setType(FuncEvent.Type.DELAY);
-        retry.setNextRetryAt(nextRetryAt);
-        retry.setRetryCount(executedRetries + 1);
-        retry.setFunction(getFunction());
-        retry.setProcessInstanceID(getProcessInstanceID());
-        retry.setContext(getContext());
-        return retry;
-    }
 }

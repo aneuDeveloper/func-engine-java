@@ -20,14 +20,14 @@ public class DefaultTopicResolver implements TopicResolver {
     }
 
     @Override
-    public String resolveTopicName(FuncEvent.Type functionType) {
+    public String resolveTopicName(String functionType) {
         if (functionType == null) {
-            functionType = FuncEvent.Type.WORKFLOW;
+            return this.prefix + FuncEvent.Type.WORKFLOW.name();
         }
-        switch (functionType) {
-            case TRANSIENT:
+        switch (functionType.toUpperCase()) {
+            case "TRANSIENT":
                 return "TRANSIENT";
-            case DELAY:
+            case "DELAY":
                 return "DELAY";
             default:
                 return this.prefix + FuncEvent.Type.WORKFLOW.name();

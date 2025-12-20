@@ -11,8 +11,7 @@
 package io.github.aneudeveloper.func.engine.function;
 
 public interface FuncContextSerDes<T> {
-    public String serialize(T context);
+    public byte[] serialize(T data);
 
-    public T deserialize(String context);
+    public T deserialize(byte[] data);
 }
-

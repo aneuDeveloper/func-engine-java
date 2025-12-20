@@ -10,9 +10,13 @@
 */
 package io.github.aneudeveloper.func.engine;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Collection;
 import java.util.Optional;
 
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
@@ -20,7 +24,6 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KeyValueMapper;
 import org.apache.kafka.streams.kstream.Named;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.processor.RecordContext;
@@ -33,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
 import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
+import io.github.aneudeveloper.func.engine.function.FuncEventBuilder;
 
 public class FuncStream<T> {
     private static final Logger LOGGER = LoggerFactory.getLogger(FuncStream.class);
@@ -51,56 +55,89 @@ public class FuncStream<T> {
             throw new IllegalStateException("Cannot start workflow without any topics to observe.");
         }
         LOGGER.info("Starting workflow stream for following topics: {}", topics.toString());
-        Serde<FuncEvent<T>> processEventSerde = this.processDefinition.getSerde();
+        Serde<T> processEventSerde = this.processDefinition.getSerde();
         StreamsBuilder streamsBuilder = new StreamsBuilder();
-        KStream<String, FuncEvent<T>> stream = streamsBuilder.stream(topics,
+        KStream<String, T> stream = streamsBuilder.stream(topics,
                 Consumed.with(Serdes.String(), processEventSerde));
 
-        stream.filter(this::shouldExecuteFuntion) //
-                .mapValues(this.processEventExecuter::executeMessageAndDiscoverNextStep) //
-                .process(() -> new Processor<String, FuncEvent<T>, String, FuncEvent<T>>() {
-                    private ProcessorContext<String, FuncEvent<T>> context;
+        stream
+                .process(() -> new Processor<String, T, String, T>() {
+                    private ProcessorContext<String, T> context;
 
                     @Override
-                    public void init(ProcessorContext<String, FuncEvent<T>> context) {
+                    public void init(ProcessorContext<String, T> context) {
                         this.context = context;
                     }
 
                     @Override
-                    public void process(Record<String, FuncEvent<T>> record) {
-                        FuncEvent<T> funcEvent = record.value();
+                    public void process(Record<String, T> record) {
+                        T message = record.value();
                         if (LOGGER.isTraceEnabled()) {
                             LOGGER.trace("Message received: {}", new String(FuncStream.this.processDefinition
-                                    .getSerde().serializer().serialize(null, funcEvent)));
+                                    .getSerde().serializer().serialize(null, message)));
                         }
 
-                        Optional<RecordMetadata> metadata = context.recordMetadata();
-                        if (metadata.isPresent()) {
-                            String topic = metadata.get().topic();
-                            funcEvent.setSourceTopic(topic);
-                        }
+                        FuncEvent<T> funcEvent = processDefinition.getFuncEventMapper().from(record.headers(),
+                                message);
+                        try {
+                            if (!shouldExecuteFuntion(funcEvent)) {
+                                return;
+                            }
+                            FuncEvent<T> nextEvent = processEventExecuter.executeMessageAndDiscoverNextStep(funcEvent);
 
-                        context.forward(record.withValue(funcEvent));
+                            Headers nextHeaders = processDefinition.getFuncEventMapper().toHeader(null, nextEvent);
+                            Optional<RecordMetadata> metadata = context.recordMetadata();
+                            if (metadata.isPresent()) {
+                                String topic = metadata.get().topic();
+                                nextHeaders.add(FuncEvent.SOURCE_TOPIC, topic.getBytes());
+                            }
+
+                            Record<String, T> nextRecord = record.withValue(nextEvent.getContext())
+                                    .withHeaders(nextHeaders);
+
+                            if (nextEvent != null && nextEvent.getType() != null && nextEvent.getType() == Type.DELAY) {
+                                if (LOGGER.isTraceEnabled()) {
+                                    LOGGER.trace("define key for DELAY topic key: {}", funcEvent.getId());
+                                }
+                                nextRecord = nextRecord.withKey(funcEvent.getId());
+                            }
+
+                            context.forward(nextRecord);
+                        } catch (Exception e) {
+                            LOGGER.error("Error while executing function. ProcessInstanceID={} functionId={}",
+                                    funcEvent.getProcessInstanceID(), funcEvent.getId(), e);
+
+                            FuncEvent<T> nextFunction = FuncEventBuilder.newEvent();
+                            nextFunction.setProcessName(funcEvent.getProcessName());
+                            nextFunction.setComingFromId(funcEvent.getId());
+                            nextFunction.setProcessInstanceID(funcEvent.getProcessInstanceID());
+                            nextFunction.setType(FuncEvent.Type.ERROR);
+
+                            Headers header = FuncStream.this.processDefinition.getFuncEventMapper().toHeader(null,
+                                    nextFunction);
+
+                            StringWriter sw = new StringWriter();
+                            PrintWriter pw = new PrintWriter(sw);
+                            e.printStackTrace(pw);
+
+                            String destTopic = FuncStream.this.processDefinition.getTopicResolver()
+                                    .resolveTopicName(FuncEvent.Type.ERROR.name());
+                            try {
+                                FuncStream.this.processDefinition.sendContentWait(destTopic, null, header,
+                                        sw.toString().getBytes());
+                            } catch (Exception errorProducerException) {
+                                LOGGER.error("could not send exception to destTopic={} for functionId={}", destTopic,
+                                        funcEvent.getId(), errorProducerException);
+                                throw new RuntimeException("Could not write process error to topic. Try later.");
+                            }
+                        }
                     }
 
                     @Override
                     public void close() {
                     }
                 }, Named.as(processDefinition.getProcessName() + "-processor"), new String[0])
-                .selectKey(new KeyValueMapper<String, FuncEvent<T>, String>() {
-                    @Override
-                    public String apply(String key, FuncEvent<T> funcEvent) {
-                        if (funcEvent.getType() != null && funcEvent.getType() == Type.DELAY) {
-                            if (LOGGER.isTraceEnabled()) {
-                                LOGGER.trace("define key for DELAY topic key: {}", funcEvent.getId());
-                            }
-                            return funcEvent.getId();
-                        }
-                        return key;
-                    }
-
-                })
-                .to((key, functionEvent, recordContext) -> this.toTopic(key, functionEvent, recordContext),
+                .to((key, funcContext, recordContext) -> this.toTopic(key, funcContext, recordContext),
                         Produced.with(Serdes.String(), processEventSerde));
 
         this.streams = new KafkaStreams(streamsBuilder.build(), processDefinition.getFuncStreamProperties());
@@ -110,15 +147,24 @@ public class FuncStream<T> {
         this.streams.start();
     }
 
-    private boolean shouldExecuteFuntion(String key, FuncEvent<T> value) {
-        boolean shouldExecute = (value.getType() == null || value.getType() == FuncEvent.Type.WORKFLOW)
-                && value.getFunction() != null && !value.getFunction().isBlank();
+    private boolean shouldExecuteFuntion(FuncEvent<T> value) {
+        boolean shouldExecute = value.getType() == FuncEvent.Type.WORKFLOW ||
+                value.getType() == FuncEvent.Type.TRANSIENT;
         return shouldExecute;
     }
 
-    private String toTopic(String key, FuncEvent<T> functionEvent, RecordContext recordContext) {
-        String topic = this.processDefinition.getTopicResolver().resolveTopicName(functionEvent.getType());
-        return topic;
+    private String toTopic(String key, T functionEvent, RecordContext recordContext) {
+        try {
+            Iterable<Header> headers = recordContext.headers().headers(FuncEvent.TYPE);
+            if (headers != null) {
+                String topic = this.processDefinition.getTopicResolver()
+                        .resolveTopicName(new String(headers.iterator().next().value()));
+                return topic;
+            }
+        } catch (Exception e) {
+            LOGGER.info(e.getMessage(), e);
+        }
+        return this.processDefinition.getTopicResolver().resolveTopicName(null);
     }
 
     public void close() {
@@ -133,4 +179,5 @@ public class FuncStream<T> {
             this.uncaughtExceptionHandler = uncaughtExceptionHandler;
         }
     }
+
 }

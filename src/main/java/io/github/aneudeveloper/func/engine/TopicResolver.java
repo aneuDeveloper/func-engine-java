@@ -10,9 +10,6 @@
 */
 package io.github.aneudeveloper.func.engine;
 
-import io.github.aneudeveloper.func.engine.function.FuncEvent;
-
 public interface TopicResolver {
-    String resolveTopicName(FuncEvent.Type eventType);
+    String resolveTopicName(String eventType);
 }
-

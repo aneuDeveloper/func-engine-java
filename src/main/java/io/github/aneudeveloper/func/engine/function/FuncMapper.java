@@ -10,8 +10,19 @@
 */
 package io.github.aneudeveloper.func.engine.function;
 
-public interface FuncSerDes {
-    public Func deserialize(FuncEvent functionEvent);
+public interface FuncMapper<T> {
+    /**
+     * 
+     * @param functionEvent is the representaion of the kafka message
+     * @return java object which corresponds to the kafka message.
+     *         FuncEvent.function can be used to identify java func object.
+     */
+    public Func<T> map(FuncEvent<T> functionEvent);
 
-    public String serialize(Func function);
+    /**
+     * 
+     * @param function
+     * @return value which will be stored in FuncEvent.function
+     */
+    public String map(Func<T> function);
 }

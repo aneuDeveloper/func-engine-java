@@ -11,6 +11,8 @@
 package io.github.aneudeveloper.func.engine;
 
 import java.io.Closeable;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -29,9 +31,13 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
@@ -42,9 +48,8 @@ import io.github.aneudeveloper.func.engine.function.Func;
 import io.github.aneudeveloper.func.engine.function.FuncContextSerDes;
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
 import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
-import io.github.aneudeveloper.func.engine.function.FuncEventDeserializer;
-import io.github.aneudeveloper.func.engine.function.FuncEventSerializer;
-import io.github.aneudeveloper.func.engine.function.FuncSerDes;
+import io.github.aneudeveloper.func.engine.function.FuncEventBuilder;
+import io.github.aneudeveloper.func.engine.function.FuncMapper;
 
 public class FuncEngine<T> implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(FuncEngine.class);
@@ -53,16 +58,16 @@ public class FuncEngine<T> implements Closeable {
     private String processName;
     private FuncStream<T> funcStream;
     private FuncContextSerDes<T> funcContextSerDes;
-    private FuncSerDes funcSerDes;
+    private FuncMapper<T> funcMapper;
     private TopicResolver topicResolver;
     private FuncExecuter<T> processEventExecuter;
-    private FuncEventSerializer<T> funcEventSerializer;
     private SendEventExceptionHandler sendEventExceptionHandler;
     private Properties funcStreamProperties;
     private Properties producerProperties;
     private String bootstrapServers;
     private int newTopicNumPartitions = 1;
     private short newTopicReplicationRactor = 1;
+    private FuncEventMapper<T> funcEventMapper = new FuncEventMapper<T>();;
 
     public FuncEngine(String processName, String bootstrapServers) {
         if (processName == null) {
@@ -77,7 +82,7 @@ public class FuncEngine<T> implements Closeable {
     }
 
     public void setUncaughtExceptionHandler(StreamsUncaughtExceptionHandler uncaughtExceptionHandler) {
-        if(funcStream != null){
+        if (funcStream != null) {
             this.funcStream.setUncaughtExceptionHandler(uncaughtExceptionHandler);
         }
     }
@@ -112,7 +117,7 @@ public class FuncEngine<T> implements Closeable {
         }
         LOG.debug("Start workflow={}", this.getProcessName());
 
-        String workflowTopic = getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW);
+        String workflowTopic = getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW.name());
         LOG.info("Observe workflow topic: {}", workflowTopic);
 
         funcStream = new FuncStream<T>(this, this.processEventExecuter);
@@ -183,9 +188,9 @@ public class FuncEngine<T> implements Closeable {
     private Set<String> getMissingTopics() {
         Set<String> topicsToCreate = new HashSet<>();
         ArrayList<String> requiredTopics = new ArrayList<>();
-        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW));
-        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT));
-        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.DELAY));
+        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW.name()));
+        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT.name()));
+        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.DELAY.name()));
         Properties properties = this.getAdminClientProperties();
         AdminClient adminClient = AdminClient.create(properties);
         if (adminClient == null) {
@@ -243,9 +248,11 @@ public class FuncEngine<T> implements Closeable {
             return;
         }
         try {
-            FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
-            byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
+            byte[] serialize = getFuncContextSerDes().serialize(functionEvent.getContext());
+
+            Headers headers = getFuncEventMapper().toHeader(new RecordHeaders(), functionEvent);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, null, key, serialize,
+                    headers);
             this.kafkaProducer.send(record);
             this.kafkaProducer.flush();
         } catch (Exception e) {
@@ -263,9 +270,11 @@ public class FuncEngine<T> implements Closeable {
             return;
         }
         try {
-            FuncEventSerializer<T> funcEventSerializer = getFuncEventSerializer();
-            byte[] serialize = funcEventSerializer.serialize(destinationTopic, functionEvent);
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, key, serialize);
+            byte[] serialize = getFuncContextSerDes().serialize(functionEvent.getContext());
+
+            Headers headers = getFuncEventMapper().toHeader(new RecordHeaders(), functionEvent);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, null, key, serialize,
+                    headers);
             this.kafkaProducer.send(record).get();
             this.kafkaProducer.flush();
         } catch (Exception e) {
@@ -277,17 +286,39 @@ public class FuncEngine<T> implements Closeable {
         }
     }
 
-    public void sendEvent(String destinationTopic, byte[] message) {
+    public void sendContent(String destinationTopic, String key, Headers headers, byte[] functionEvent) {
         if (this.kafkaProducer == null) {
             return;
         }
         try {
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, message);
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, null, key,
+                    functionEvent,
+                    headers);
             this.kafkaProducer.send(record);
             this.kafkaProducer.flush();
         } catch (Exception e) {
             if (sendEventExceptionHandler != null) {
-                sendEventExceptionHandler.onException(e, destinationTopic, message);
+                sendEventExceptionHandler.onException(e, destinationTopic, key, functionEvent);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    public void sendContentWait(String destinationTopic, String key, Headers headers, byte[] functionEvent)
+            throws Exception {
+        if (this.kafkaProducer == null) {
+            return;
+        }
+        try {
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>(destinationTopic, null, null, key,
+                    functionEvent,
+                    headers);
+            this.kafkaProducer.send(record).get();
+            this.kafkaProducer.flush();
+        } catch (Exception e) {
+            if (sendEventExceptionHandler != null) {
+                sendEventExceptionHandler.onException(e, destinationTopic, key, functionEvent);
             } else {
                 throw e;
             }
@@ -299,7 +330,7 @@ public class FuncEngine<T> implements Closeable {
             return;
         }
         try {
-            String destinationTopic = getTopicResolver().resolveTopicName(functionEvent.getType());
+            String destinationTopic = getTopicResolver().resolveTopicName(functionEvent.getType().name());
             this.sendEvent(destinationTopic, null, functionEvent);
         } catch (Exception e) {
             if (sendEventExceptionHandler != null) {
@@ -318,21 +349,32 @@ public class FuncEngine<T> implements Closeable {
         return this.getProcessName() + "_" + correlation;
     }
 
-    public FuncEventSerializer<T> getFuncEventSerializer() {
-        if (this.funcEventSerializer == null) {
-            this.funcEventSerializer = new FuncEventSerializer<>(this.getFuncContextSerDes(), this.funcSerDes);
-        }
-        return funcEventSerializer;
-    }
+    public Serde<T> getSerde() {
+        final FuncContextSerDes<T> contextSerDes = getFuncContextSerDes();
+        Serde<T> processEventSerde = Serdes.serdeFrom(new Serializer<T>() {
 
-    public Serde<FuncEvent<T>> getSerde() {
-        FuncEventDeserializer<T> funcEventDeserializer = new FuncEventDeserializer<>(this.getFuncContextSerDes());
-        Serde<FuncEvent<T>> processEventSerde = Serdes.serdeFrom(getFuncEventSerializer(), funcEventDeserializer);
+            @Override
+            public byte[] serialize(String topic, T data) {
+                if (data == null) {
+                    return "".getBytes();
+                }
+                return contextSerDes.serialize(data);
+            }
+
+        },
+                new Deserializer<T>() {
+
+                    @Override
+                    public T deserialize(String topic, byte[] data) {
+                        return contextSerDes.deserialize(data);
+                    }
+
+                });
         return processEventSerde;
     }
 
     public FuncEvent<T> execute(FuncEvent<T> newFunctionEvent) throws Exception {
-        if (newFunctionEvent.getFunctionObj() == null) {
+        if (newFunctionEvent.getFunction() == null) {
             throw new IllegalStateException(
                     "Missing function. Please provide which function should be called at start.");
         }
@@ -342,41 +384,43 @@ public class FuncEngine<T> implements Closeable {
         if (newFunctionEvent.getId() == null) {
             throw new IllegalStateException("id must be specified");
         }
-        if (newFunctionEvent.getFunction() == null && this.funcSerDes != null) {
-            newFunctionEvent.setFunction(this.funcSerDes.serialize(newFunctionEvent.getFunctionObj()));
-        }
-
         if (newFunctionEvent.getProcessInstanceID() == null) {
             newFunctionEvent.setProcessInstanceID(UUID.randomUUID().toString());
         }
         newFunctionEvent.setProcessName(this.getProcessName());
         if (newFunctionEvent.getType() == FuncEvent.Type.TRANSIENT) {
-            if (!(newFunctionEvent.getFunctionObj() instanceof Func)) {
-                throw new IllegalStateException("A transient function should be of type " + Func.class.getName());
-            }
-            FuncEvent<T> executionResult = this.processEventExecuter.executeTransientFunction(newFunctionEvent,
-                    (Func<T>) newFunctionEvent.getFunctionObj());
+            try {
+                Func<T> functionToExecute = funcMapper.map(newFunctionEvent);
+                FuncEvent<T> executionResult = this.processEventExecuter.executeTransientFunction(newFunctionEvent,
+                        functionToExecute);
 
-            if (executionResult.getType() == FuncEvent.Type.ERROR) {
-                String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT);
-                this.sendEvent(destTopic, this.getFuncEventSerializer().serialize(destTopic, executionResult));
+                if (executionResult.getType() == Type.TRANSIENT || executionResult.getType() == Type.END) {
+                    String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT.name());
+                    this.sendEvent(destTopic, null, executionResult);
 
-                if (executionResult.getError() != null) {
-                    throw executionResult.getError();
+                    return executionResult;
+                } else {
+                    newFunctionEvent = executionResult;
                 }
-                throw new RuntimeException(this.funcContextSerDes.serialize(executionResult.getContext()));
-            }
-            if (executionResult.getType() == Type.TRANSIENT || executionResult.getType() == Type.END) {
-                String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT);
-                this.sendEvent(destTopic, this.getFuncEventSerializer().serialize(destTopic, executionResult));
+            } catch (Exception e) {
+                FuncEvent<T> nextFunction = FuncEventBuilder.newEvent();
+                nextFunction.setProcessName(newFunctionEvent.getProcessName());
+                nextFunction.setComingFromId(newFunctionEvent.getId());
+                nextFunction.setProcessInstanceID(newFunctionEvent.getProcessInstanceID());
+                nextFunction.setType(FuncEvent.Type.ERROR);
 
-                return executionResult;
-            } else {
-                newFunctionEvent = executionResult;
-            }
+                Headers header = this.getFuncEventMapper().toHeader(null, nextFunction);
 
+                StringWriter sw = new StringWriter();
+                PrintWriter pw = new PrintWriter(sw);
+                e.printStackTrace(pw);
+
+                String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT.name());
+                this.sendContent(destTopic, null, header, sw.toString().getBytes());
+                throw e;
+            }
         }
-        String destinationTopic = getTopicResolver().resolveTopicName(newFunctionEvent.getType());
+        String destinationTopic = getTopicResolver().resolveTopicName(newFunctionEvent.getType().name());
         this.sendEventAndWait(destinationTopic, null, newFunctionEvent);
         return newFunctionEvent;
     }
@@ -389,28 +433,12 @@ public class FuncEngine<T> implements Closeable {
         this.funcContextSerDes = funcContextSerDes;
     }
 
-    public String getFunction(FuncEvent<T> event) {
-        if (event == null) {
-            return null;
-        }
-        if (event.getFunction() != null) {
-            return event.getFunction();
-        }
-        if (event.getFunctionObj() != null) {
-            String serializedFunction = this.funcSerDes.serialize(event.getFunctionObj());
-            event.setFunction(serializedFunction);
-        } else {
-            LOG.error("Step has not been defined.");
-        }
-        return event.getFunction();
+    public FuncMapper<T> getFuncMapper() {
+        return funcMapper;
     }
 
-    public FuncSerDes getFuncSerDes() {
-        return funcSerDes;
-    }
-
-    public void setFuncSerDes(FuncSerDes funcSerDes) {
-        this.funcSerDes = funcSerDes;
+    public void setFuncMapper(FuncMapper<T> funcSerDes) {
+        this.funcMapper = funcSerDes;
     }
 
     private Properties getAdminClientProperties() {
@@ -475,5 +503,13 @@ public class FuncEngine<T> implements Closeable {
 
     public void setNewTopicReplicationRactor(short newTopicReplicationRactor) {
         this.newTopicReplicationRactor = newTopicReplicationRactor;
+    }
+
+    public FuncEventMapper<T> getFuncEventMapper() {
+        return this.funcEventMapper;
+    }
+
+    public void setFuncEventMapper(FuncEventMapper<T> funcEventMapper) {
+        this.funcEventMapper = funcEventMapper;
     }
 }
