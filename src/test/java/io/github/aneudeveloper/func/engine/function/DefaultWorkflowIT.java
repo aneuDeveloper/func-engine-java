@@ -111,7 +111,7 @@ public class DefaultWorkflowIT {
             Assertions.assertTrue(sendEmail);
             Assertions.assertTrue(store);
 
-            KafkaComsumerTestHelper kafkaComsumerTestHelper = new KafkaComsumerTestHelper();
+            KafkaConsumerTestHelper kafkaComsumerTestHelper = new KafkaConsumerTestHelper();
             List<ConsumerRecord<String, String>> messages = kafkaComsumerTestHelper.getMessages("MyTest-WORKFLOW",
                     "DefaultTest");
             Assertions.assertNotNull(kafkaComsumerTestHelper.getFuncById(messages, sendEmailId));

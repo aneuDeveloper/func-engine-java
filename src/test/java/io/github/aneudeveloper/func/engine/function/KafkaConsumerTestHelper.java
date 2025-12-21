@@ -14,7 +14,7 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
-public class KafkaComsumerTestHelper {
+public class KafkaConsumerTestHelper {
     public List<ConsumerRecord<String, String>> getMessages(String topic, String consumerGroup) {
         // 1. Consumer configuration
         Properties props = new Properties();
