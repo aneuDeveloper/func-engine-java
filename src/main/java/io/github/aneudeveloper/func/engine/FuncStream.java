@@ -132,10 +132,6 @@ public class FuncStream<T> {
                             }
                         }
                     }
-
-                    @Override
-                    public void close() {
-                    }
                 }, Named.as(processDefinition.getProcessName() + "-processor"), new String[0])
                 .to((key, funcContext, recordContext) -> this.toTopic(key, funcContext, recordContext),
                         Produced.with(Serdes.String(), processEventSerde));
