@@ -36,7 +36,7 @@ public class FuncEventMapper<T> {
         event.setProcessName(getHeader(FuncEvent.PROCESS_NAME, headers));
         event.setProcessInstanceID(getHeader(FuncEvent.PROCESS_INSTANCE_ID, headers));
         event.setRetryCount(getHeaderAsInt(FuncEvent.RETRY_COUNT, headers));
-        event.setExecuteAt(getHeaderAsDate(FuncEvent.NEXT_RETRY_AT, headers));
+        event.setExecuteAt(getHeaderAsDate(FuncEvent.EXECUTE_AT, headers));
         event.setTimeStamp(getHeaderAsDate(FuncEvent.TIMESTAMP, headers));
         event.setFunction(getHeader(FuncEvent.FUNCTION, headers));
         return event;
@@ -104,7 +104,7 @@ public class FuncEventMapper<T> {
             headers.add(FuncEvent.FUNCTION, event.getFunction().getBytes());
         }
         if (event.getExecuteAt() != null) {
-            headers.add(FuncEvent.NEXT_RETRY_AT,
+            headers.add(FuncEvent.EXECUTE_AT,
                     event.getExecuteAt().format(TIME_STAMP_FORMATTER).getBytes());
         }
         if (event.getTimeStamp() != null) {
