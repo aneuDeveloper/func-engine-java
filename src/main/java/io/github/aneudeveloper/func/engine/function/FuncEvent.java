@@ -19,13 +19,13 @@ public class FuncEvent<T> {
 
     public static final String VERSION = "v";
     public static final String ID = "id";
-    public static final String PROCESS_NAME = "processName";
-    public static final String COMING_FROM_ID = "comingFromId";
+    public static final String PROCESS_NAME = "process_name";
+    public static final String COMING_FROM_ID = "coming_from_id";
     public static final String FUNCTION = "function";
-    public static final String PROCESS_INSTANCE_ID = "processInstanceID";
-    public static final String RETRY_COUNT = "retryCount";
-    public static final String EXECUTE_AT = "executeAt";
-    public static final String SOURCE_TOPIC = "sourceTopic";
+    public static final String PROCESS_INSTANCE_ID = "process_instance_id";
+    public static final String RETRY_COUNT = "retry_count";
+    public static final String EXECUTE_AT = "execute_at";
+    public static final String DESTINATION_TOPIC = "destination_topic";
     public static final String TYPE = "type";
     public static final String TIMESTAMP = "timestamp";
 
@@ -139,11 +139,11 @@ public class FuncEvent<T> {
         return this;
     }
 
-    public String getSourceTopic() {
+    public String getDestinationTopic() {
         return this.sourceTopic;
     }
 
-    public FuncEvent<T> setSourceTopic(String sourceTopic) {
+    public FuncEvent<T> setDestinationTopic(String sourceTopic) {
         this.sourceTopic = sourceTopic;
         return this;
     }

@@ -10,6 +10,7 @@
 */
 package io.github.aneudeveloper.func.engine;
 
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
@@ -89,27 +90,27 @@ public class FuncEventMapper<T> {
             headers = new RecordHeaders();
         }
         if (event.getVersion() != null) {
-            headers.add(FuncEvent.VERSION, event.getVersion().getBytes());
+            headers.add(FuncEvent.VERSION, event.getVersion().getBytes(StandardCharsets.UTF_8));
         }
         if (event.getId() != null) {
-            headers.add(FuncEvent.ID, event.getId().getBytes());
+            headers.add(FuncEvent.ID, event.getId().getBytes(StandardCharsets.UTF_8));
         }
         if (event.getComingFromId() != null) {
-            headers.add(FuncEvent.COMING_FROM_ID, event.getComingFromId().getBytes());
+            headers.add(FuncEvent.COMING_FROM_ID, event.getComingFromId().getBytes(StandardCharsets.UTF_8));
         }
         if (event.getType() != null) {
-            headers.add(FuncEvent.TYPE, event.getType().name().getBytes());
+            headers.add(FuncEvent.TYPE, event.getType().name().getBytes(StandardCharsets.UTF_8));
         }
         if (event.getFunction() != null) {
-            headers.add(FuncEvent.FUNCTION, event.getFunction().getBytes());
+            headers.add(FuncEvent.FUNCTION, event.getFunction().getBytes(StandardCharsets.UTF_8));
         }
         if (event.getExecuteAt() != null) {
             headers.add(FuncEvent.EXECUTE_AT,
-                    event.getExecuteAt().format(TIME_STAMP_FORMATTER).getBytes());
+                    event.getExecuteAt().format(TIME_STAMP_FORMATTER).getBytes(StandardCharsets.UTF_8));
         }
         if (event.getTimeStamp() != null) {
             headers.add(FuncEvent.TIMESTAMP,
-                    event.getTimeStamp().format(TIME_STAMP_FORMATTER).getBytes());
+                    event.getTimeStamp().format(TIME_STAMP_FORMATTER).getBytes(StandardCharsets.UTF_8));
         }
         return headers;
     }

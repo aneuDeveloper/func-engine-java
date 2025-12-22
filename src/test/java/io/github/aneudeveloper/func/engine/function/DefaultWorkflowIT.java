@@ -23,7 +23,7 @@ public class DefaultWorkflowIT {
         @Override
         public FuncEvent<String> work(FuncEvent<String> functionEvent) {
             sendEmailId = functionEvent.getId();
-            functionEvent.setContext(functionEvent.getContext() + " sending email ");
+            functionEvent.setContext(functionEvent.getContext() + " supertest2 ");
             sendEmail = true;
             return FuncEventBuilder.createAsChild(functionEvent).setFunction("store");
         }

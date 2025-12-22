@@ -89,7 +89,7 @@ public class FuncStream<T> {
                             Optional<RecordMetadata> metadata = context.recordMetadata();
                             if (metadata.isPresent()) {
                                 String topic = metadata.get().topic();
-                                nextHeaders.add(FuncEvent.SOURCE_TOPIC, topic.getBytes());
+                                nextHeaders.add(FuncEvent.DESTINATION_TOPIC, topic.getBytes());
                             }
 
                             Record<String, T> nextRecord = record.withValue(nextEvent.getContext())
