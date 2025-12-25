@@ -46,7 +46,6 @@ public class FuncExecuter<T> {
         endEvent.setType(FuncEvent.Type.END);
         endEvent.setProcessInstanceID(functionEvent.getProcessInstanceID());
         endEvent.setComingFromId(functionEvent.getId());
-        endEvent.setContext(functionEvent.getContext());
         return endEvent;
     }
 
