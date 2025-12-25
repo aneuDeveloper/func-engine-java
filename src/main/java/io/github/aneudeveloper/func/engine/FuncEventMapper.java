@@ -112,6 +112,14 @@ public class FuncEventMapper<T> {
             headers.add(FuncEvent.TIMESTAMP,
                     event.getTimeStamp().format(TIME_STAMP_FORMATTER).getBytes(StandardCharsets.UTF_8));
         }
+        if (event.getProcessInstanceID() != null) {
+            headers.add(FuncEvent.PROCESS_INSTANCE_ID,
+                    event.getProcessInstanceID().getBytes(StandardCharsets.UTF_8));
+        }
+        if (event.getProcessName() != null) {
+            headers.add(FuncEvent.PROCESS_NAME,
+                    event.getProcessName().getBytes(StandardCharsets.UTF_8));
+        }
         return headers;
     }
 
