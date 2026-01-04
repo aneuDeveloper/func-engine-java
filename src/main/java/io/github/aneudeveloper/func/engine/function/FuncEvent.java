@@ -21,7 +21,7 @@ public class FuncEvent<T> {
     public static final String ID = "id";
     public static final String PROCESS_NAME = "process_name";
     public static final String COMING_FROM_ID = "coming_from_id";
-    public static final String FUNCTION = "function";
+    public static final String FUNCTION = "func";
     public static final String PROCESS_INSTANCE_ID = "process_instance_id";
     public static final String RETRY_COUNT = "retry_count";
     public static final String EXECUTE_AT = "execute_at";
