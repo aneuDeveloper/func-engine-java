@@ -67,7 +67,8 @@ public class FuncEngine<T> implements Closeable {
     private String bootstrapServers;
     private int newTopicNumPartitions = 1;
     private short newTopicReplicationRactor = 1;
-    private FuncEventMapper<T> funcEventMapper = new FuncEventMapper<T>();;
+    private FuncEventMapper<T> funcEventMapper = new FuncEventMapper<T>();
+    private String delayTopicName;
 
     public FuncEngine(String processName, String bootstrapServers) {
         if (processName == null) {
@@ -117,7 +118,7 @@ public class FuncEngine<T> implements Closeable {
         }
         LOG.debug("Start workflow={}", this.getProcessName());
 
-        String workflowTopic = getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW.name());
+        String workflowTopic = getTopicResolver().resolveByType(FuncEvent.Type.WORKFLOW);
         LOG.info("Observe workflow topic: {}", workflowTopic);
 
         funcStream = new FuncStream<T>(this, this.processEventExecuter);
@@ -188,9 +189,8 @@ public class FuncEngine<T> implements Closeable {
     private Set<String> getMissingTopics() {
         Set<String> topicsToCreate = new HashSet<>();
         ArrayList<String> requiredTopics = new ArrayList<>();
-        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW.name()));
-        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT.name()));
-        requiredTopics.add(getTopicResolver().resolveTopicName("DELAY"));
+        requiredTopics.add(getTopicResolver().resolveByType(FuncEvent.Type.WORKFLOW));
+        requiredTopics.add(getTopicResolver().resolveByType(FuncEvent.Type.TRANSIENT));
         Properties properties = this.getAdminClientProperties();
         AdminClient adminClient = AdminClient.create(properties);
         if (adminClient == null) {
@@ -330,7 +330,7 @@ public class FuncEngine<T> implements Closeable {
             return;
         }
         try {
-            String destinationTopic = getTopicResolver().resolveTopicName(functionEvent.getType().name());
+            String destinationTopic = getTopicResolver().resolveByType(functionEvent.getType());
             this.sendEvent(destinationTopic, null, functionEvent);
         } catch (Exception e) {
             if (sendEventExceptionHandler != null) {
@@ -395,7 +395,7 @@ public class FuncEngine<T> implements Closeable {
                         functionToExecute);
 
                 if (executionResult.getType() == Type.TRANSIENT || executionResult.getType() == Type.END) {
-                    String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT.name());
+                    String destTopic = this.topicResolver.resolveByType(FuncEvent.Type.TRANSIENT);
                     this.sendEvent(destTopic, null, executionResult);
 
                     return executionResult;
@@ -415,12 +415,12 @@ public class FuncEngine<T> implements Closeable {
                 PrintWriter pw = new PrintWriter(sw);
                 e.printStackTrace(pw);
 
-                String destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT.name());
+                String destTopic = this.topicResolver.resolveByType(FuncEvent.Type.TRANSIENT);
                 this.sendContent(destTopic, null, header, sw.toString().getBytes());
                 throw e;
             }
         }
-        String destinationTopic = getTopicResolver().resolveTopicName(newFunctionEvent.getType().name());
+        String destinationTopic = getTopicResolver().resolveByType(newFunctionEvent.getType());
         this.sendEventAndWait(destinationTopic, null, newFunctionEvent);
         return newFunctionEvent;
     }
@@ -449,7 +449,11 @@ public class FuncEngine<T> implements Closeable {
 
     public TopicResolver getTopicResolver() {
         if (this.topicResolver == null) {
-            this.topicResolver = new DefaultTopicResolver(this.processName + "-");
+            String delayTopicName = getDelayTopicName();
+            if (delayTopicName == null || delayTopicName.isEmpty()) {
+                delayTopicName = "DELAY";
+            }
+            this.topicResolver = new DefaultTopicResolver(this.processName + "-", delayTopicName);
         }
         return this.topicResolver;
     }
@@ -511,5 +515,13 @@ public class FuncEngine<T> implements Closeable {
 
     public void setFuncEventMapper(FuncEventMapper<T> funcEventMapper) {
         this.funcEventMapper = funcEventMapper;
+    }
+
+    public String getDelayTopicName() {
+        return delayTopicName;
+    }
+
+    public void setDelayTopicName(String delayTopicName) {
+        this.delayTopicName = delayTopicName;
     }
 }

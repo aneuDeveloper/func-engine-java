@@ -10,28 +10,66 @@
 */
 package io.github.aneudeveloper.func.engine;
 
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.streams.processor.RecordContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.github.aneudeveloper.func.engine.function.FuncEvent;
+import io.github.aneudeveloper.func.engine.function.FuncEvent.Type;
 
 public class DefaultTopicResolver implements TopicResolver {
-    private String prefix;
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultTopicResolver.class);
 
-    public DefaultTopicResolver(String prefix) {
+    private String prefix;
+    private String delayTopicName;
+
+    public DefaultTopicResolver(String prefix, String delayTopicName) {
         this.prefix = prefix;
+        this.delayTopicName = delayTopicName;
     }
 
     @Override
-    public String resolveTopicName(String functionType) {
-        if (functionType == null) {
-            return this.prefix + FuncEvent.Type.WORKFLOW.name();
+    public String resolveByType(Type type) {
+        if (type == null) {
+            return Type.DEAD_LETTER.name();
         }
-        switch (functionType.toUpperCase()) {
-            case "TRANSIENT":
-                return "TRANSIENT";
-            case "DELAY":
-                return "DELAY";
+
+        switch (type) {
+            case DEAD_LETTER:
+            case TRANSIENT:
+                return type.name();
             default:
                 return this.prefix + FuncEvent.Type.WORKFLOW.name();
         }
-
     }
+
+    @Override
+    public <T> String resolve(T message, RecordContext recordContext) {
+        try {
+            Iterable<Header> typeHeaders = recordContext.headers().headers(FuncEvent.TYPE);
+            String type = null;
+            if (typeHeaders != null && typeHeaders.iterator().hasNext()) {
+                type = new String(typeHeaders.iterator().next().value());
+            }
+
+            Iterable<Header> executeAtHeader = recordContext.headers().headers(FuncEvent.EXECUTE_AT);
+            String executeAt = null;
+            if (executeAtHeader != null && executeAtHeader.iterator().hasNext()) {
+                executeAt = new String(executeAtHeader.iterator().next().value());
+            }
+
+            if (type != null && !type.isEmpty() && executeAt != null && !executeAt.isEmpty()) {
+                return delayTopicName;
+            }
+            if (type != null && !type.isEmpty()) {
+                return resolveByType(Type.valueOf(type));
+            }
+            return resolveByType(Type.DEAD_LETTER);
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+            return resolveByType(Type.DEAD_LETTER);
+        }
+    }
+
 }

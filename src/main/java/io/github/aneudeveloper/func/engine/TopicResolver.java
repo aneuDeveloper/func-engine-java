@@ -10,6 +10,13 @@
 */
 package io.github.aneudeveloper.func.engine;
 
+import org.apache.kafka.streams.processor.RecordContext;
+
+import io.github.aneudeveloper.func.engine.function.FuncEvent;
+
 public interface TopicResolver {
-    String resolveTopicName(String eventType);
+    String resolveByType(FuncEvent.Type type);
+
+    <T> String resolve(T message, RecordContext recordContext);
+
 }

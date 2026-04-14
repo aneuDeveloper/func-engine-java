@@ -15,7 +15,6 @@ import java.io.StringWriter;
 import java.util.Collection;
 import java.util.Optional;
 
-import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -121,7 +120,7 @@ public class FuncStream<T> {
                             e.printStackTrace(pw);
 
                             String destTopic = FuncStream.this.processDefinition.getTopicResolver()
-                                    .resolveTopicName(FuncEvent.Type.ERROR.name());
+                                    .resolveByType(FuncEvent.Type.ERROR);
                             try {
                                 FuncStream.this.processDefinition.sendContentWait(destTopic, null, header,
                                         sw.toString().getBytes());
@@ -149,18 +148,14 @@ public class FuncStream<T> {
         return shouldExecute;
     }
 
-    private String toTopic(String key, T functionEvent, RecordContext recordContext) {
+    private String toTopic(String key, T message, RecordContext recordContext) {
         try {
-            Iterable<Header> headers = recordContext.headers().headers(FuncEvent.TYPE);
-            if (headers != null) {
-                String topic = this.processDefinition.getTopicResolver()
-                        .resolveTopicName(new String(headers.iterator().next().value()));
-                return topic;
-            }
+            String topic = this.processDefinition.getTopicResolver().resolve(message, recordContext);
+            return topic;
         } catch (Exception e) {
-            LOGGER.info(e.getMessage(), e);
+            LOGGER.error(e.getMessage(), e);
+            return this.processDefinition.getTopicResolver().resolveByType(Type.DEAD_LETTER);
         }
-        return this.processDefinition.getTopicResolver().resolveTopicName(null);
     }
 
     public void close() {

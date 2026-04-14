@@ -15,7 +15,7 @@ import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
 public class KafkaConsumerTestHelper {
-    public List<ConsumerRecord<String, String>> getMessages(String topic, String consumerGroup) {
+    public static List<ConsumerRecord<String, String>> getMessages(String topic, String consumerGroup) {
         // 1. Consumer configuration
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "127.0.0.1:9092");
@@ -29,9 +29,6 @@ public class KafkaConsumerTestHelper {
         consumer.subscribe(Collections.singletonList(topic));
 
         List<ConsumerRecord<String, String>> returnVal = new ArrayList<>();
-        // for (ConsumerRecords<String, String> records = consumer
-        // .poll(Duration.ofMillis(1000)); records != null
-        // && !records.isEmpty(); records = consumer.poll(Duration.ofMillis(1000))) {
 
         for (int i = 0; i < 10; i++) {
             ConsumerRecords<String, String> records = consumer
@@ -40,7 +37,6 @@ public class KafkaConsumerTestHelper {
                 returnVal.add(record);
             }
         }
-        // }
 
         consumer.close();
 
@@ -66,7 +62,7 @@ public class KafkaConsumerTestHelper {
         return null;
     }
 
-     public ConsumerRecord<String, String> getFuncById(List<ConsumerRecord<String, String>> messages, String id) {
+    public ConsumerRecord<String, String> getFuncById(List<ConsumerRecord<String, String>> messages, String id) {
         for (ConsumerRecord<String, String> message : messages) {
 
             Headers headers = message.headers();

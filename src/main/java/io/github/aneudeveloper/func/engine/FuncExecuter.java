@@ -87,7 +87,7 @@ public class FuncExecuter<T> {
         }
         String destTopic = null;
         try {
-            destTopic = this.topicResolver.resolveTopicName(FuncEvent.Type.TRANSIENT.name());
+            destTopic = this.topicResolver.resolveByType(FuncEvent.Type.TRANSIENT);
 
             FuncEvent<T> result = function.work(functionEvent);
 
