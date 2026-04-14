@@ -14,7 +14,7 @@ import java.time.ZonedDateTime;
 
 public class FuncEvent<T> {
     public static enum Type {
-        END, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR, DELAY;
+        END, DEAD_LETTER, WORKFLOW, TRANSIENT, ERROR;
     }
 
     public static final String VERSION = "v";

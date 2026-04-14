@@ -57,13 +57,14 @@ public class FuncExecuter<T> {
 
         if (functionEvent.getType() != Type.WORKFLOW && functionEvent.getType() != Type.TRANSIENT) {
             throw new IllegalStateException(
-                    "Invalid event was passed. Only type=WORKFLOW or type=TRANSIENT can be executed. Type was="
+                    "Invalid event was passed. Only type=WORKFLOW or type=TRANSIENT or type=DELAY can be executed. Type was="
                             + functionEvent.getType());
         }
         Func<T> function = functionWorkflow.getFuncMapper().map(functionEvent);
         if (function == null) {
             throw new IllegalStateException(
-                    "could not execute function id=" + functionEvent.getId() + " because no function could be identified with FuncMapper.map (returned null)");
+                    "could not execute function id=" + functionEvent.getId()
+                            + " because no function could be identified with FuncMapper.map (returned null)");
         }
         if (functionEvent.getType() == FuncEvent.Type.TRANSIENT) {
             return this.executeTransientFunction(functionEvent, (Func<T>) function);
@@ -95,7 +96,7 @@ public class FuncExecuter<T> {
                 this.functionWorkflow.sendEvent(destTopic, null, endEvent);
                 return endEvent;
             }
-            if (result.getType() == Type.DELAY) {
+            if (result.getExecuteAt() != null) {
                 long millisToWait = (result.getExecuteAt().toEpochSecond() * 1000) - System.currentTimeMillis();
                 if (millisToWait > 0) {
                     this.functionWorkflow.sendEvent(destTopic, null, result);

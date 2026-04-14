@@ -27,9 +27,9 @@ public class FuncEventBuilder {
 
     public static final <T> FuncEvent<T> newEventWorkflowPrefilled() {
         FuncEvent<T> event = new FuncEvent<T>("1", UUID.randomUUID().toString())//
-        .setTimeStamp(ZonedDateTime.now())
-        .setProcessInstanceID(UUID.randomUUID().toString())
-        .setType(Type.WORKFLOW);
+                .setTimeStamp(ZonedDateTime.now())
+                .setProcessInstanceID(UUID.randomUUID().toString())
+                .setType(Type.WORKFLOW);
         return event;
     }
 
@@ -94,7 +94,7 @@ public class FuncEventBuilder {
         FuncEvent<T> retry = newEvent();
         retry.setProcessName(parent.getProcessName());
         retry.setComingFromId(parent.getId());
-        retry.setType(FuncEvent.Type.DELAY);
+        retry.setType(FuncEvent.Type.WORKFLOW);
         retry.setExecuteAt(nextRetryAt);
         retry.setRetryCount(executedRetries + 1);
         retry.setFunction(parent.getFunction());

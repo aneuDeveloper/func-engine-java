@@ -190,7 +190,7 @@ public class FuncEngine<T> implements Closeable {
         ArrayList<String> requiredTopics = new ArrayList<>();
         requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.WORKFLOW.name()));
         requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.TRANSIENT.name()));
-        requiredTopics.add(getTopicResolver().resolveTopicName(FuncEvent.Type.DELAY.name()));
+        requiredTopics.add(getTopicResolver().resolveTopicName("DELAY"));
         Properties properties = this.getAdminClientProperties();
         AdminClient adminClient = AdminClient.create(properties);
         if (adminClient == null) {

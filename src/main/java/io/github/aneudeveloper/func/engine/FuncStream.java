@@ -95,7 +95,7 @@ public class FuncStream<T> {
                             Record<String, T> nextRecord = record.withValue(nextEvent.getContext())
                                     .withHeaders(nextHeaders);
 
-                            if (nextEvent != null && nextEvent.getType() != null && nextEvent.getType() == Type.DELAY) {
+                            if (nextEvent != null && nextEvent.getExecuteAt() != null) {
                                 if (LOGGER.isTraceEnabled()) {
                                     LOGGER.trace("define key for DELAY topic key: {}", funcEvent.getId());
                                 }
