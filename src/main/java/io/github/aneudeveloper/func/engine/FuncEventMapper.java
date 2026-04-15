@@ -120,6 +120,10 @@ public class FuncEventMapper<T> {
             headers.add(FuncEvent.PROCESS_NAME,
                     event.getProcessName().getBytes(StandardCharsets.UTF_8));
         }
+        if (event.getRetryCount() != null) {
+            headers.add(FuncEvent.RETRY_COUNT,
+                    String.valueOf(event.getRetryCount()).getBytes(StandardCharsets.UTF_8));
+        }
         return headers;
     }
 
