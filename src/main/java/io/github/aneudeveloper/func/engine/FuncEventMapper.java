@@ -80,7 +80,11 @@ public class FuncEventMapper<T> {
     private FuncEvent.Type getHeaderType(String key, Headers headers) {
         String asString = getHeader(key, headers);
         if (asString != null && !asString.isEmpty()) {
-            return FuncEvent.Type.valueOf(asString);
+            try {
+                return FuncEvent.Type.valueOf(asString);
+            } catch (IllegalArgumentException e) {
+                LOGGER.error("unknown key={} type={} was defined. Continue processing without type.", key, asString, e);
+            }
         }
         return null;
     }
